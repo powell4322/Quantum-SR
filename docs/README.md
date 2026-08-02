@@ -9,6 +9,8 @@
 | `PAPER_PROGRESS.md` | **论文驾驶舱 + GPT 审核入口**：钉死 contribution / motivation / 实验路线 / 投稿定位（WWW），内置"给 GPT 的提交模板"和审核反馈记录表 | **每阶段完成后、准备给 GPT 审时** |
 | `RESEARCH_LOG.md` | **研究追踪**：RQ 状态、实验设计、待验证问题、实验结果日志（E001+）、已知问题（如 Tr/BCE 不匹配） | 做实验、记录结果、查"在验证什么"时 |
 | `THEORY.md` | **理论支撑**：密度矩阵合法性、偏好惯性演化、Hilbert–Schmidt 打分、自由度分析 | 写 Method / 理论部分、核对"为什么成立"时 |
+| `RELATED_WORK.md` | **相关工作总结 + 防撞对照表**（quantum rec / uncertainty rec / distributional rec） | 投稿前防撞、写 Related Works 时 |
+| `EXPERIMENT_PLAN.md` | **实验矩阵**（数据集、baseline、主/消融/分析） | 规划/跑实验、保证公平对比时 |
 
 ## 二、代码文档
 

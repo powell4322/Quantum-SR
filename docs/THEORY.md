@@ -10,7 +10,7 @@
 1. 把三个研究假设（H1/H2/H3）写成精确的数学命题；
 2. 给出密度矩阵构造、状态演化、测量匹配的严格定义与合法性证明；
 3. 明确与已有工作（尤其 WWW 2026 静态 quantum CF）的理论边界；
-4. 为"为什么叫 quantum-inspired"提供自洽辩护。
+4. 明确定位：density operator 作为**数学工具**（不是研究问题），控制 "quantum" 出现次数，避免审稿人认为"只是搬量子概念"。
 
 ---
 
@@ -77,17 +77,14 @@ $$\mathrm{dof}(\rho)=dr-\frac{r(r-1)}{2}-1$$
 
 ## 3. 状态演化：偏好惯性模型（H2 / RQ2，核心创新）
 
-### 3.1 量子开放系统视角
+### 3.1 状态演化的一般形式
 
-真实量子态在噪声/测量/环境作用下按 **CPTP 映射**（完全正保迹）演化：
-
-$$\rho' = \mathcal{E}(\rho), \qquad \mathcal{E} \text{ 为 CPTP}$$
-
-我们采用其最简单且实现可微的形式——**凸组合**：
+我们考虑形如 $\rho_{t+1}=\mathcal{F}(\rho_t,\rho_{i_t})$ 的演化，并采用最简单、可微且**保证合法性**的形式——**凸组合**：
 
 $$\rho_{t+1} = \alpha\,\rho_t + (1-\alpha)\,\rho_{i_t}, \qquad \alpha \in [0,1]$$
 
 其中 $\rho_{i_t}$ 是当前交互物品诱导的状态。
+> ⚠️ 表述口径（采纳 GPT 审稿建议）：**不展开 CPTP/Kraus**——我们的演化是凸组合，不是完整量子信道；避免被物理背景审稿人攻击。量子仅作为"合法性保持"的灵感来源。
 
 ### 3.2 合法性证明（保 PSD 与 trace）
 
@@ -179,18 +176,18 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\the
 
 ## 7. 论文叙事框架（可复用）
 
-> Sequential recommendation models usually encode evolving user preferences as **deterministic latent vectors** $h_t$. We argue that user interest is inherently **uncertain and multi-faceted**, and evolves with each interaction. We propose to represent it as a **dynamic quantum-probabilistic state** (density matrix) $\rho_t$, which (i) captures multi-interest structure via its spectrum, (ii) evolves via a **legality-preserving convex combination** (an information-injecting depolarization), and (iii) scores next items via **Hilbert–Schmidt measurement** $\mathrm{Tr}(\rho_t\rho_i)$. Extensive experiments on MovieLens show consistent gains under constrained embedding dimensions and on long-tail items.
+> Sequential recommendation models usually encode evolving user preferences as **deterministic latent vectors** $h_t$. We argue that user interest is inherently **uncertain and multi-faceted**, and evolves with each interaction. We propose to represent it as a **dynamic density state** $\rho_t$ (PSD, trace=1), which (i) provides a second-order representation of preference uncertainty, (ii) evolves via a **legality-preserving preference-inertia transition** (convex combination), and (iii) scores next items via **Hilbert–Schmidt similarity** $\mathrm{Tr}(\rho_t\rho_i)$.
 
-贡献三点（与 `docs/PAPER_PROGRESS.md` §3 一致，C1/C2/C3）：
-- **C1**：首次将密度状态表示引入序列推荐，显式建模偏好不确定性（second-order 结构）。
-- **C2**：提出合法性保持的凸组合状态演化——偏好惯性模型（含自适应 $\alpha_t$），建模兴趣漂移。
-- **C3**：建立 Hilbert–Schmidt 相似度打分，并在多编码器/多数据集上验证普适性。
+贡献三点（与 `docs/PAPER_PROGRESS.md` §3 一致，按重要度）：
+- **C1**：动态密度状态建模——把不确定偏好建模为受约束状态（second-order 结构）。
+- **C2**：合法性保持的偏好惯性演化（含自适应 $\alpha_t$），显式建模兴趣漂移。
+- **C3**：密度状态相似度学习（Hilbert–Schmidt 核）+ 多数据集/多 baseline 系统评估。
 
 ---
 
 ## 8. 建议引用/支撑方向（供写作时查证）
 
-- 量子信息基础：Nielsen & Chuang；密度矩阵 / Born 规则 / CPTP / 去极化信道。
+- 量子信息基础（仅作来源说明）：Nielsen & Chuang；密度矩阵 / Hilbert–Schmidt 内积。
 - Quantum ML：quantum kernel / quantum representation learning（包括 WWW 2026 相关工作）。
 - 序列推荐：SASRec、BERT4Rec、GRU4Rec、MIND、ComiRec、SSE-PT。
 - 不确定性建模：uncertainty-aware recommendation / distributional representation。
@@ -199,7 +196,7 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\the
 
 ## 9. 待补理论工作（Open Problems）
 
-- [ ] 给 $F(\rho_t,\rho_i)$ 更一般的 CPTP 形式（Kraus 算子），并论证凸组合是其一阶近似；
-- [ ] 兴趣演化的可解释性：用 $\rho_t$ 的谱分解做"推荐理由"（仅作 discussion 灵感，不强 claim 测量坍缩）；
-- [ ] 泛化/信息论分析：密度矩阵表示在有限样本下的优势界（可作 future work / 理论补充章节）；
+- [ ] ~~更一般的 CPTP/Kraus 形式~~（已按审稿建议弱化，不展开量子信道）；
+- [ ] 兴趣演化的可解释性：用 $\rho_t$ 的谱分解做"推荐理由"（仅作 discussion 灵感）；
+- [ ] 泛化/信息论分析：密度状态表示在有限样本下的优势界（future work）；
 - [ ] 与注意力因果 mask 的严格对应：$\rho_t$ 只依赖 $S_{\le t}$ 的形式化。
