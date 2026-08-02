@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 数据集（大文件不入库，实验时在服务器/本地单独放置）
+data/
+
+# 训练输出与结果
+ml-1m_*/
+results/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
