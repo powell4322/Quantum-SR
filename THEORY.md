@@ -26,7 +26,7 @@
 |---|---|
 | 兴趣向量 $h_t \in \mathbb{R}^d$ | 密度矩阵 $\rho_t \in \mathcal{H}^{d\times d}$ |
 | 物品向量 $e_i \in \mathbb{R}^d$ | 物品态 $\rho_i$（与用户同构构造） |
-| 相似度 $h_t^\top e_i$ | 测量概率 $\mathrm{Tr}(\rho_t \rho_i)$ |
+| 相似度 $h_t^\top e_i$ | Hilbert–Schmidt 相似度 $\mathrm{Tr}(\rho_t \rho_i)$ |
 | 状态更新（RNN/attention） | 状态演化 $\rho_{t+1} = F(\rho_t, \rho_{i_t})$ |
 
 ---
@@ -36,7 +36,8 @@
 ### 2.1 纯态与混合态
 
 - **纯态**（rank-1）：$\rho = |\psi\rangle\langle\psi|$，等价于一个确定方向。
-- **混合态**（rank>1）：$\rho = \sum_k \lambda_k |\psi_k\rangle\langle\psi_k|$，$\lambda_k \ge 0, \sum_k\lambda_k=1$，可解释为"用户以概率 $\lambda_k$ 处于兴趣 $k$"。
+- **混合态**（rank>1）：$\rho = \sum_k \lambda_k |\psi_k\rangle\langle\psi_k|$，$\lambda_k \ge 0, \sum_k\lambda_k=1$。
+- ⚠️ 措辞口径：谱分解 $\sum_k\lambda_k|\psi_k\rangle\langle\psi_k|$ 提供**用户偏好不确定性的潜在分解（latent decomposition of preference uncertainty）**；rank>1 只表示秩更高，**不自动对应"多个语义兴趣"**——我们不承诺"每个特征向量=一个兴趣"。
 
 ### 2.2 密度矩阵的三条合法性公理
 
@@ -59,17 +60,22 @@ $$\rho_t = \frac{L_t L_t^\top}{\mathrm{Tr}(L_t L_t^\top)}, \qquad L_t = W h_t \i
 - 除以迹后 $\mathrm{Tr}(\rho)=1$；
 - $r=1$ 时为纯态（$\mathrm{rank}=1$），$r>1$ 时为混合态。
 
-### 2.4 表达力论证（RQ4 的理论支撑）
+### 2.4 参数量与有效自由度（精确分析，勿再写"更多自由度"）
 
-- 向量参数：$d$ 个自由度；$d\times r$ 低秩密度矩阵：$O(dr)$ 个自由度。
-- 当 $r \ge 1$，在**相同参数量预算**下，密度矩阵把"方向信息"扩展为"分布信息"：一个 $d$ 维概率单纯形可以容纳的兴趣中心远多于一个点。
-- 形式上：$\rho$ 的谱分解 $\sum_k \lambda_k |\psi_k\rangle\langle\psi_k|$ 即"多兴趣 + 兴趣强度"的显式表示，而向量 $h_t$ 只有一个方向。
+- 参数量：$L$ 有 $dr$ 个参数。
+- 有效自由度：$\rho=LL^\top$ 对 $L$ 有**正交旋转歧义**（$L\mapsto LQ,\ Q\in O(r)$ 不改变 $\rho$），且受 trace=1 约束，故
 
-> ⚠️ 对应实验：RQ4（不同 latent/rank 下的表现，低维优势）。
+$$\mathrm{dof}(\rho)=dr-\frac{r(r-1)}{2}-1$$
+
+- $r=1$：$\mathrm{dof}=d-1$，恰好是单位向量所在球面 $S^{d-1}$ 的自由度 → **纯态与向量同量级**（"state 是 vector 的自然推广"的关键证据）。
+- $r=d$：$\mathrm{dof}=\frac{d(d+1)}{2}-1$，即 trace 固定的对称矩阵。
+
+> 结论表述（论文用）：*Low-rank density operators provide a structured second-order representation with controllable rank complexity.* —— 卖点是 **second-order 结构** 与 **rank 可控性**，不是"更多自由度"。
+> ⚠️ 对应实验：A-1 维度效率（vector $d=64$ vs state $d=32,r=4$，固定参数量）。
 
 ---
 
-## 3. 状态演化：兴趣的动态性（H2 / RQ3，核心创新）
+## 3. 状态演化：偏好惯性模型（H2 / RQ2，核心创新）
 
 ### 3.1 量子开放系统视角
 
@@ -89,39 +95,51 @@ $$\rho_{t+1} = \alpha\,\rho_t + (1-\alpha)\,\rho_{i_t}, \qquad \alpha \in [0,1]$
 - **PSD**：PSD 集合是凸锥，两个 PSD 矩阵的非负组合仍 PSD。
 - 因此凸组合是"合法状态演化"的最小实现，且**标量 $\alpha$ 带来零额外参数量**（或仅 1 个可学习标量）。
 
-### 3.3 与去极化信道的联系
+### 3.3 推荐语义：偏好惯性（Preference Inertia）
 
-标准去极化信道：$\rho' = (1-p)\rho + p\,\frac{I}{d}$（向完全混合态收缩）。
-我们的形式 $\rho' = \alpha\rho_t + (1-\alpha)\rho_{i_t}$ 可看作"向**新观测到的物品态**混合"而非"向均匀态混合"，即**信息注入式演化**——语义上对应"用户看到新物品后兴趣被更新"。
+凸组合 $\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$ 在推荐语义上解释为**偏好惯性**：$\alpha_t$ 越大越保留旧兴趣，越小越快速吸收新兴趣。
+- 与去极化信道的联系：标准去极化 $\rho'=(1-p)\rho+p\,\frac{I}{d}$ 是"向完全混合态收缩"；我们改为"向**新观测物品态**混合"，即**信息注入式演化**（用户看到新物品后兴趣被更新）。
 
-### 3.4 与 RNN/GRU 状态更新的关键区别（论文卖点）
+### 3.4 与经典方法的关系（回应 "Why not GRU?"）
+
+- **固定 $\alpha$**：展开得 $\rho_T=\alpha^{T-1}\rho_1+(1-\alpha)\sum_{k=1}^{T-1}\alpha^{T-1-k}\rho_{i_k}$，即**指数滑动平均（EMA）/ 几何加权**——旧兴趣按 $\alpha$ 指数衰减，天然具备遗忘机制；语义上等价于贝叶斯滤波的信息合并。
+- **与 GRU/门控的区别（论文卖点）**：凸组合结构保证**中间状态永远是合法密度算子（PSD+trace 保持）**——这是 GRU/门控在表示层面不具备的硬约束。
 
 | | RNN/GRU | 我们的凸组合 |
 |---|---|---|
 | 更新形式 | 线性变换 + 非线性（$z,r,\tilde h$） | 概率混合 |
-| 状态语义 | 隐藏向量（无概率解释） | 概率分布（$\lambda_k$ = 兴趣强度） |
+| 状态语义 | 隐藏向量（无概率解释） | 概率分布（谱分解） |
 | 合法性 | 无约束 | 恒保 PSD + trace |
-| 兴趣解释 | 隐含 | 显式谱分解 |
+| 遗忘机制 | 隐式门控 | 显式指数衰减（$\alpha$） |
+
+### 3.5 自适应 $\alpha_t$（关键增强，C2 的一部分）
+
+$$\alpha_t=\sigma\big(W\,[h_t;\,e_{i_t}]+b\big)$$
+
+- 含义：不同用户（甚至不同时刻）的兴趣稳定度不同——长期稳定用户 $\alpha_t\uparrow$，探索型用户 $\alpha_t\downarrow$。
+- 梯度风险：可学习/自适应 $\alpha$ 可能坍缩到 0/1（见 `RESEARCH_LOG.md` §4.5 开放清单）。
 
 ---
 
-## 4. 测量匹配：next-item 预测（H3 / RQ2）
+## 4. 打分：Hilbert–Schmidt 相似度（H3 / 打分模块）
 
-### 4.1 Born 规则
+### 4.1 定位：Hilbert–Schmidt 内积（作为 similarity kernel，而非强调"测量坍缩"）
 
-量子测量：状态 $\rho$ 下测得 POVM 元素 $M$ 的概率为
-
-$$P(M\,|\,\rho) = \mathrm{Tr}(\rho M)$$
-
-### 4.2 映射到推荐
-
-把"候选物品态 $\rho_i$"视为测量算子（若 $\rho_i$ 是 PSD 且迹归一，可归一化为 POVM 元素），则
-
-$$\text{score}(u,i) = \mathrm{Tr}(\rho_{u}\,\rho_i)$$
-
-有"用户状态坍缩到物品态的概率"的量子语义。当 $\rho_u,\rho_i$ 都是密度矩阵时，$\mathrm{Tr}(\rho_u\rho_i)$ 是 **Hilbert–Schmidt 内积**：
+当 $\rho_u,\rho_i$ 都是密度矩阵时，$\mathrm{Tr}(\rho_u\rho_i)$ 本质是 $\mathbb{R}^{d\times d}$ 上的 **Hilbert–Schmidt 内积**：
 
 $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
+
+论文表述：*We adopt Hilbert–Schmidt similarity induced by density operators.*（Born-rule / 测量坍缩仅作为 discussion 的灵感来源，不做强 claim。）
+
+### 4.2 与 dot product 的精确桥梁（重要）
+
+当 $\rho_u,\rho_i$ 均为**纯态**（rank-1）$\rho_u=uu^\top,\ \rho_i=ii^\top$ 时：
+
+$$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\theta$$
+
+即 trace 打分退化为**平方余弦**（有界 $[0,1]$），而 vector dot 无界。这：
+1. 为"state ⊇ vector"提供严格桥梁（$r=1$ 时 state 恰是平方点积核）；
+2. 解释了 Tr/BCE 不匹配（`RESEARCH_LOG.md` §4.4）：logits 被压到 $[0,1]$。
 
 ### 4.3 与 dot product 的对比
 
@@ -129,9 +147,9 @@ $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
 |---|---|---|
 | 对象 | 向量欧氏内积 | 算子内积（含二次/交叉项） |
 | 表达能力 | 一阶 | 二阶（$\rho$ 含 $h h^\top$ 类结构） |
-| 概率语义 | 无 | 有（Born 规则） |
+| 有界性 | 无界 | $[0,1]$（需损失兼容修正，见 `RESEARCH_LOG.md` §4.4） |
 
-> ⚠️ 注意：$\rho$ 含 $L L^\top$ 结构，$\mathrm{Tr}(\rho_u\rho_i)$ 实际等价于对"特征化后的方向"做加权内积——这也解释了为何在受限维度下更可能优于纯 dot。**这是 RQ2 待验证的核心。**
+> ⚠️ 注意：$\rho$ 含 $L L^\top$ 结构，$\mathrm{Tr}(\rho_u\rho_i)$ 实际等价于对"特征化后的方向"做加权内积——这是受限维度下可能优于纯 dot 的原因；**打分有效性由 A-5 匹配消融验证。**
 
 ---
 
@@ -141,10 +159,10 @@ $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
 |---|---|---|
 | P1 | 构造式 $\rho = LL^\top/\mathrm{Tr}$ 恒为合法密度矩阵 | ✅ 实现已验证（`test_smoke.py`） |
 | P2 | 凸组合演化保 PSD 与 trace | ✅ 数学证明 + 实现验证 |
-| P3 | 同参数量下，低秩密度矩阵自由度 ≥ 向量（$r\ge1$） | ✅ 计数论证（§2.4） |
-| P4 | $\mathrm{Tr}(\rho_u\rho_i)$ 恒在 $[0,1]$（若双方均为密度矩阵） | ✅ 由 Cauchy–Schwarz + PSD 可得 |
-| P5 | 动态演化对"兴趣漂移"的建模能力优于静态 $\rho_u$ | ⬜ 待实验（RQ3） |
-| P6 | 低维下 $\rho$ 表示优于向量表示（长尾/多样性） | ⬜ 待实验（RQ4/RQ5/RQ6） |
+| P3 | 低秩密度矩阵有效自由度 $\mathrm{dof}=dr-\frac{r(r-1)}{2}-1$；$r=1$ 时恰为 $d-1$（= 单位球面自由度） | ✅ 计数论证（§2.4） |
+| P4 | $\mathrm{Tr}(\rho_u\rho_i)\in[0,1]$（双方均为密度矩阵）；纯态下 $=(u\cdot i)^2$ | ✅ 由 Cauchy–Schwarz + PSD 可得 |
+| P5 | 动态演化对"兴趣漂移"的建模能力优于静态 $\rho_u$ | ⬜ 待实验（RQ2 / Exp.C） |
+| P6 | 低维下 $\rho$ 表示优于向量表示（长尾/多样性） | ⬜ 待实验（RQ3 / A-1, A-4） |
 
 ---
 
@@ -163,10 +181,10 @@ $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
 
 > Sequential recommendation models usually encode evolving user preferences as **deterministic latent vectors** $h_t$. We argue that user interest is inherently **uncertain and multi-faceted**, and evolves with each interaction. We propose to represent it as a **dynamic quantum-probabilistic state** (density matrix) $\rho_t$, which (i) captures multi-interest structure via its spectrum, (ii) evolves via a **legality-preserving convex combination** (an information-injecting depolarization), and (iii) scores next items via **Hilbert–Schmidt measurement** $\mathrm{Tr}(\rho_t\rho_i)$. Extensive experiments on MovieLens show consistent gains under constrained embedding dimensions and on long-tail items.
 
-贡献三点：
-1. 首次将动态密度矩阵状态引入序列推荐；
-2. 提出保合法性的凸组合状态演化（理论 + 实现）；
-3. 建立基于 Hilbert–Schmidt 测量的 next-item 打分机制。
+贡献三点（与 `PAPER_PROGRESS.md` §3 一致，C1/C2/C3）：
+- **C1**：首次将密度状态表示引入序列推荐，显式建模偏好不确定性（second-order 结构）。
+- **C2**：提出合法性保持的凸组合状态演化——偏好惯性模型（含自适应 $\alpha_t$），建模兴趣漂移。
+- **C3**：建立 Hilbert–Schmidt 相似度打分，并在多编码器/多数据集上验证普适性。
 
 ---
 
@@ -182,6 +200,6 @@ $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
 ## 9. 待补理论工作（Open Problems）
 
 - [ ] 给 $F(\rho_t,\rho_i)$ 更一般的 CPTP 形式（Kraus 算子），并论证凸组合是其一阶近似；
-- [ ] 兴趣演化的可解释性：用 $\rho_t$ 的谱分解做"推荐理由"（测量坍缩叙事）；
+- [ ] 兴趣演化的可解释性：用 $\rho_t$ 的谱分解做"推荐理由"（仅作 discussion 灵感，不强 claim 测量坍缩）；
 - [ ] 泛化/信息论分析：密度矩阵表示在有限样本下的优势界（可作 future work / 理论补充章节）；
 - [ ] 与注意力因果 mask 的严格对应：$\rho_t$ 只依赖 $S_{\le t}$ 的形式化。
