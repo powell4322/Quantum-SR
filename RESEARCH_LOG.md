@@ -278,6 +278,17 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 10. [ ] Experiment A：固定参数量维度效率（vector $d=64$ vs state $d=32,r=4$）。
 11. [ ] RQ3 长尾/多样性附实验（热度分组、coverage / ILD）。
 
+### Priority 4（模型泛化：拓展到其他序列模型）
+> 目标：证明 quantum 多方案框架**不限于 SASRec**——对论文的 generalization / 方法普适性是加分项。
+> **当前决策（2026-08-02）**：先专注 SASRec 完成全部核心实验（RQ1/RQ2/RQ3 + Tr 修正）；拓展目标暂定为 **GRU4Rec + BERT4Rec**（与 SASRec 共 3 个核心模型）；Caser / STAMP 等视实验结论与论文相关性再定，暂不承诺。
+> 当前架构已解耦：`StateProjection`（任意 $(...,C)\to(...,C,C)$）、`StateTransition`（凸组合）都是独立模块，任何输出 $(U,T,C)$ 的编码器都能接入。
+
+12. [ ] 先完成 SASRec 的 RQ1/RQ2/RQ3 与 Tr 打分修正（主线）。
+13. [ ] 拓展到 GRU4Rec（RNN，每步 $h_t$ 天然适配）、BERT4Rec（双向 Transformer）。
+14. [ ] 架构：把 `SASRec._to_state_sequence` + 打分逻辑抽取为可复用 `QuantumStateHead`（基类接口：编码器只管出 $h_t$ 序列，head 负责 $\rho_t$ / 演化 / 匹配）。
+15. [ ] ⚠️ 注意点：BERT4Rec 双向注意力 vs SASRec 单向因果，**演化语义要重定义**（用 [MASK] 位打分还是每步演化？）；GRU4Rec 无 position 语义，逐时间步演化最自然。
+16. [ ] 结论可写成论文 "generalization across sequence encoders" 小节。
+
 ### 写作准备
 12. [ ] 基于 §9 文献探讨收敛 related work 叙事：强调 Sequential Gap，量子仅作工具。
 13. [ ] 更新 §4 理论清单，把"alpha 是否坍缩"等疑问转成实验。
