@@ -236,7 +236,7 @@ bce_criterion = torch.nn.BCEWithLogitsLoss()
 3. 对比 `cuda` 和 `cpu` 的训练速度
 4. 结合实际推荐指标（HR、NDCG）分析结果
 5. 尝试本项目新增的量子启发扩展：`--variant state / dynamic`（见 §10），研究密度状态表示与动态演化的效果
-6. 配合研究文档 `RESEARCH_LOG.md`，跟踪 RQ1/RQ2/RQ3 的验证进度
+6. 配合研究文档 `docs/RESEARCH_LOG.md`，跟踪 RQ1/RQ2/RQ3 的验证进度
 
 ---
 
@@ -248,7 +248,7 @@ SASRec 的本质是：用自注意力机制建模用户历史行为序列中的�
 
 ## 10. 附录：量子启发扩展（state / dynamic variant）代码解析
 
-> 本附录与 `RESEARCH_LOG.md` §4（理论笔记）配套，解释代码层面的实现。核心思想：把"最后一个向量 $h_t$"升级为"密度状态 $\rho_t$"并支持时序演化。
+> 本附录与 `docs/RESEARCH_LOG.md` §4（理论笔记）配套，解释代码层面的实现。核心思想：把"最后一个向量 $h_t$"升级为"密度状态 $\rho_t$"并支持时序演化。
 
 ### 10.1 三种 variant
 
@@ -274,7 +274,7 @@ class StateProjection(torch.nn.Module):
 ```
 
 - 数学：$\rho = LL^\top / \mathrm{Tr}(LL^\top)$，$L\in\mathbb{R}^{d\times r}$。天然满足半正定 + trace=1（密度矩阵合法性）。
-- `rank` 越大，$\rho$ 的谱越丰富（混合态），对应兴趣不确定性的潜在分解（详见 `RESEARCH_LOG.md` §4.1）。
+- `rank` 越大，$\rho$ 的谱越丰富（混合态），对应兴趣不确定性的潜在分解（详见 `docs/RESEARCH_LOG.md` §4.1）。
 
 ### 10.3 `StateTransition`：动态演化（偏好惯性）
 
@@ -306,4 +306,4 @@ uv run main.py --dataset ml-1m --train_dir quant_state --variant state --state_r
 uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --state_rank 1 --transition learnable --device cpu
 ```
 
-> ⚠️ 已知问题（见 `RESEARCH_LOG.md` §4.4）：$\mathrm{Tr}$ 打分被压到 $[0,1]$，与 `BCEWithLogitsLoss` 不匹配，当前结果不代表最终效果，需先修正打分/损失再下结论。
+> ⚠️ 已知问题（见 `docs/RESEARCH_LOG.md` §4.4）：$\mathrm{Tr}$ 打分被压到 $[0,1]$，与 `BCEWithLogitsLoss` 不匹配，当前结果不代表最终效果，需先修正打分/损失再下结论。

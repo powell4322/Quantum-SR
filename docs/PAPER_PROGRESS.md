@@ -26,7 +26,7 @@
 
 ## 2. Motivation（动机，可直接进 Intro）
 
-两个核心 Gap（详见 `RESEARCH_LOG.md` §1）：
+两个核心 Gap（详见 `docs/RESEARCH_LOG.md` §1）：
 
 1. **Sequential Gap（核心空白）**：现有 quantum-inspired 推荐（WWW 2026 等）只做**静态 CF**（静态 $\rho_u$），**从未**把 density-operator 用于建模序列兴趣的**演化与漂移**。
 2. **Representation Gap**：主流序列推荐（SASRec/BERT4Rec）用点估计表示兴趣，丢失**不确定性**与**多模态偏好结构**；density-operator 提供统一的 second-order 表示。
@@ -69,7 +69,7 @@
 - 在 GRU4Rec / BERT4Rec 上复现 E002/E003 → 写成 *generalization across encoders*。
 
 ### 4.4 铁律
-- 除被验证维度外**同超参**；Tr/BCE 兼容修正（§4.4 RESEARCH_LOG）落地后再跑正式实验；结果回填 `RESEARCH_LOG.md` §6 与本文档 §4。
+- 除被验证维度外**同超参**；Tr/BCE 兼容修正（§4.4 RESEARCH_LOG）落地后再跑正式实验；结果回填 `docs/RESEARCH_LOG.md` §6 与本文档 §4。
 
 ---
 
@@ -97,10 +97,10 @@
 
 | 文档 | 职责 | 结论 |
 |---|---|---|
-| `RESEARCH_LOG.md` | 研究追踪（RQ 状态、实验日志、问题） | ✅ **保留**（核心） |
-| `THEORY.md` | 论文理论支撑（正式、权威源） | ✅ **保留**，但需与 RESEARCH_LOG 新口径对齐（rank>1 谱分解、dof 分析、偏好惯性） |
-| `PAPER_PROGRESS.md` | 论文推进+审核驱动（本文档） | ✅ **保留**（新增） |
-| `sasrec.md` | 代码使用说明 | ✅ **保留**（英文名，已决定；中文名文档已删除） |
+| `docs/RESEARCH_LOG.md` | 研究追踪（RQ 状态、实验日志、问题） | ✅ **保留**（核心） |
+| `docs/THEORY.md` | 论文理论支撑（正式、权威源） | ✅ **保留**，但需与 RESEARCH_LOG 新口径对齐（rank>1 谱分解、dof 分析、偏好惯性） |
+| `docs/PAPER_PROGRESS.md` | 论文推进+审核驱动（本文档） | ✅ **保留**（新增） |
+| `docs/sasrec.md` | 代码使用说明 | ✅ **保留**（英文名，已决定；中文名文档已删除） |
 | `.github/skills/*` | 研究 skill | ✅ 保留（需同步 quantum-seq-rec 的"rank>1 多兴趣"措辞） |
 
 **职责划分原则**：RESEARCH_LOG = 研究过程（是什么/发生了什么）；THEORY = 理论为什么成立；PAPER_PROGRESS = 论文怎么组织+审核入口；使用说明 = 给代码使用者。避免同一内容出现在两处。
@@ -108,8 +108,8 @@
 ---
 
 ## 7. 当前状态 & 下一步（截至 2026-08-02）
-- [x] 文档去重：保留 `sasrec.md`，删除中文名文档（2026-08-02）
-- [x] THEORY.md 与 RESEARCH_LOG 新口径对齐（2026-08-02）
+- [x] 文档去重：保留 `docs/sasrec.md`，删除中文名文档（2026-08-02）
+- [x] docs/THEORY.md 与 RESEARCH_LOG 新口径对齐（2026-08-02）
 - [ ] 确定目标会议（§1.2）与截稿
 - [ ] 主线：Tr 打分修正 → E001 基线复现（GPU）
 - [ ] 每阶段用 §5 模板提交 GPT 审核并回填
