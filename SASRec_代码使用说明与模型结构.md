@@ -235,9 +235,75 @@ bce_criterion = torch.nn.BCEWithLogitsLoss()
 2. 调整 `maxlen`，看看序列长度是否影响效果
 3. 对比 `cuda` 和 `cpu` 的训练速度
 4. 结合实际推荐指标（HR、NDCG）分析结果
+5. 尝试本项目新增的量子启发扩展：`--variant state / dynamic`（见 §10），研究密度状态表示与动态演化的效果
+6. 配合研究文档 `RESEARCH_LOG.md`，跟踪 RQ1/RQ2/RQ3 的验证进度
 
 ---
 
 ## 9. 一句话总结
 
 SASRec 的本质是：用自注意力机制建模用户历史行为序列中的长期依赖关系，然后通过最后一个时间步的表示来预测下一个可能感兴趣的物品。
+
+---
+
+## 10. 附录：量子启发扩展（state / dynamic variant）代码解析
+
+> 本附录与 `RESEARCH_LOG.md` §4（理论笔记）配套，解释代码层面的实现。核心思想：把"最后一个向量 $h_t$"升级为"密度状态 $\rho_t$"并支持时序演化。
+
+### 10.1 三种 variant
+
+| variant | 说明 | 打分 |
+|---|---|---|
+| `vector`（默认） | 原始 SASRec，兴趣为向量 $h_t$ | dot product（无界） |
+| `state` | 兴趣为密度状态 $\rho$，只用最后一步 $\rho_T$ | $\mathrm{Tr}(\rho_T\rho_i)\in[0,1]$ |
+| `dynamic` | 在 `state` 基础上沿时间步做凸组合演化 | 同上 |
+
+### 10.2 `StateProjection`：向量 → 密度状态
+
+```python
+class StateProjection(torch.nn.Module):
+    def __init__(self, hidden_units, rank=1):
+        self.proj = torch.nn.Linear(hidden_units, hidden_units * rank, bias=False)
+
+    def forward(self, inputs):               # inputs: (..., C)
+        L = self.proj(inputs).view(*inputs.shape[:-1], self.rank, self.hidden_units)
+        rho = torch.matmul(L.transpose(-1, -2), L)   # (..., C, C)，半正定
+        trace = torch.diagonal(rho, dim1=-2, dim2=-1).sum(dim=-1)
+        rho = rho / trace.clamp_min(1e-8)            # 归一化到 trace=1
+        return rho
+```
+
+- 数学：$\rho = LL^\top / \mathrm{Tr}(LL^\top)$，$L\in\mathbb{R}^{d\times r}$。天然满足半正定 + trace=1（密度矩阵合法性）。
+- `rank` 越大，$\rho$ 的谱越丰富（混合态），对应兴趣不确定性的潜在分解（详见 `RESEARCH_LOG.md` §4.1）。
+
+### 10.3 `StateTransition`：动态演化（偏好惯性）
+
+```python
+class StateTransition(torch.nn.Module):
+    def __init__(self, hidden_units, learnable=False, init_alpha=0.9):
+        init_logit = np.log(init_alpha / (1.0 - init_alpha))
+        self.logit = (torch.nn.Parameter if learnable else lambda t: torch.tensor(...))  # 简化示意
+
+    def forward(self, rho_prev, rho_cur):
+        alpha = torch.sigmoid(self.logit)
+        return alpha * rho_prev + (1.0 - alpha) * rho_cur
+```
+
+- 数学：$\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$，凸组合保证中间状态始终是合法密度矩阵（PSD + trace 保持）。
+- `--transition fixed`：$\alpha$ 固定标量；`--transition learnable`：$\alpha$ 为全局可学习标量（sigmoid 保证在 $[0,1]$）。
+
+### 10.4 训练 / 推理打分
+
+- 训练：`pos_logits = (rho_seq * rho_pos).sum(dim=(-1,-2))`，即 $\mathrm{Tr}(\rho_{t}\,\rho_{pos})$；负样本同理。
+- 推理：`rho_user = rho_seq[:, -1]`（取最后一步状态），`logits = (rho_user * rho_item).sum(dim=(-1,-2))`。
+
+### 10.5 运行示例（uv）
+
+```bash
+# 静态密度状态（RQ1）
+uv run main.py --dataset ml-1m --train_dir quant_state --variant state --state_rank 1 --device cpu
+# 动态演化（RQ2 核心）
+uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --state_rank 1 --transition learnable --device cpu
+```
+
+> ⚠️ 已知问题（见 `RESEARCH_LOG.md` §4.4）：$\mathrm{Tr}$ 打分被压到 $[0,1]$，与 `BCEWithLogitsLoss` 不匹配，当前结果不代表最终效果，需先修正打分/损失再下结论。
