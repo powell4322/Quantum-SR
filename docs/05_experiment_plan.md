@@ -14,21 +14,19 @@
 | `Yelp`（候选） | 大 | **兴趣变化** | E004 兴趣漂移 |
 - ⚠️ 数据文件不入库（gitignore），服务器/本地单独放置 `data/`。
 
-## 2. Baseline（WWW 标准：不能只有 SASRec）
+## 2. Baseline（2026-08-03 定稿：主表 6 个，不多加）
 
-**序列 baseline（Sequential）**
+**主表 baseline**
 | baseline | 说明 | 状态 |
 |---|---|---|
-| SASRec | 原始点估计基线（同参数量） | ✅ 已有（vector variant） |
-| GRU4Rec | RNN 序列基线 | ⬜ 待接入（Priority 4 泛化） |
-| BERT4Rec | 双向 Transformer 基线 | ⬜ 待接入（Priority 4 泛化） |
+| GRU4Rec | RNN 基线（与 DMPEN 同族，便于解释 DMPEN 提升来源） | ⬜ 待接入 |
+| SASRec | Transformer 点估计基线（= vector variant） | ✅ 已有 |
+| BERT4Rec | 双向 Transformer 基线 | ⬜ 待接入 |
+| **DMPEN** | density-as-feature + RNN（**关键对照，证明 feature≠state**） | ⬜ E000 复现 |
+| Ours-static | 密度状态、无演化 | ✅ 已有（state variant） |
+| Ours-dynamic | 密度状态 + 合法性演化 | ✅ 已有（dynamic variant） |
 
-**不确定性/表示 baseline（必须，否则 RQ1 不公平）**
-| baseline | 说明 | 回答 |
-|---|---|---|
-| Gaussian embedding | $z\sim\mathcal N(\mu,\Sigma)$，KL/内积打分 | RQ1：density vs 分布 |
-| MIND / ComiRec | multi-interest 表示 | RQ1：density vs 多兴趣 |
-- ⚠️ 不加这些，审稿人会说"只对比了确定性向量，不公平"。
+> 暂缓（先证明 idea，WWW 不是 baseline 越多越好）：Caser / Gaussian embedding / MIND / ComiRec。
 
 ## 3. 主实验矩阵（与 PAPER_PROGRESS §4.1 对应）
 

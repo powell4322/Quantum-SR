@@ -94,8 +94,8 @@ $$\rho_{t+1} = \alpha\,\rho_t + (1-\alpha)\,\rho_{i_t}, \qquad \alpha \in [0,1]$
 
 ### 3.3 推荐语义：偏好惯性（Preference Inertia）
 
-凸组合 $\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$ 在推荐语义上解释为**偏好惯性**：$\alpha_t$ 越大越保留旧兴趣，越小越快速吸收新兴趣。
-- 与去极化信道的联系：标准去极化 $\rho'=(1-p)\rho+p\,\frac{I}{d}$ 是"向完全混合态收缩"；我们改为"向**新观测物品态**混合"，即**信息注入式演化**（用户看到新物品后兴趣被更新）。
+凸组合 $\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$ 在推荐语义上解释为**偏好惯性**：$\alpha_t$ 越大越保留旧兴趣（稳定用户），越小越快速吸收新兴趣（探索/漂移用户）。
+- 固定 $\alpha$ 时展开为 EMA / 几何加权，旧兴趣按 $\alpha$ 指数衰减，天然具备遗忘机制（展开式见 §3.4）。
 
 ### 3.4 与经典方法的关系（回应 "Why not GRU?"）
 
@@ -120,13 +120,13 @@ $$\alpha_t=\sigma\big(W\,[h_t;\,e_{i_t}]+b\big)$$
 
 ## 4. 打分：Hilbert–Schmidt 相似度（H3 / 打分模块）
 
-### 4.1 定位：Hilbert–Schmidt 内积（作为 similarity kernel，而非强调"测量坍缩"）
+### 4.1 定位：Hilbert–Schmidt 内积（operator-level similarity kernel）
 
 当 $\rho_u,\rho_i$ 都是密度矩阵时，$\mathrm{Tr}(\rho_u\rho_i)$ 本质是 $\mathbb{R}^{d\times d}$ 上的 **Hilbert–Schmidt 内积**：
 
 $$\langle \rho_u, \rho_i \rangle_{HS} = \mathrm{Tr}(\rho_u^\dagger \rho_i)$$
 
-论文表述：*We adopt Hilbert–Schmidt similarity induced by density operators.*（Born-rule / 测量坍缩仅作为 discussion 的灵感来源，不做强 claim。）
+论文表述：*We adopt Hilbert–Schmidt similarity (an operator-level kernel) induced by density states.*（不用 "quantum measurement / Born rule" 表述。）
 
 ### 4.2 与 dot product 的精确桥梁（重要）
 

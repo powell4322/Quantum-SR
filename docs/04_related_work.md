@@ -8,7 +8,7 @@
 ## 0. 结论（2026-08-03 更新：发现关键邻近先例，需精读）
 - 🔴 **DMPEN（DASFAA 2019）已精读（2026-08-03）**：density matrix + RNN 序列演化**确实已存在**——**"首次 density+sequential" 不成立**。DMPEN 把 density matrix 当作**二阶特征**（$\rho=ee^\top$）输入 RNN；密度**不是偏好状态**，演化靠 RNN hidden state，无 PSD+trace 硬约束。
 - ✅ **我们的差异化（已确认可立足）**：研究 **density operator 作为动态偏好状态**，提出 **legality-preserving 凸组合演化**（每步保 PSD+trace）——这是 DMPEN 没有的（问题从"如何把行为编码成 density matrix"变为"density state 如何被合法演化"）。
-- ⚠️ 论文必须：① 显式引用 DMPEN 并说明差异；② 加 DMPEN-style baseline；③ 标题避免与 DMPEN 撞车。
+- ⚠️ 论文必须：① 显式引用 DMPEN 并说明差异；② **DMPEN 作为主表 baseline（E000 复现）**；③ 标题避免与 DMPEN 撞车；④ 主表仅 6 个 baseline（GRU4Rec/SASRec/BERT4Rec/DMPEN/Ours-static/Ours-dynamic），Caser/Gaussian/MIND 暂缓。
 
 ---
 
