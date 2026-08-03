@@ -5,10 +5,11 @@
 
 ---
 
-## 0. 结论占位（调研后填写）
-- [ ] 是否已有工作做 **dynamic density-state evolution for sequential recommendation**？→ 结论：______
-- [ ] 是否已有工作做 **legality-preserving preference transition**？→ 结论：______
-- 若已有：我们的差异点 / 可引用的"我们与之不同"的表述 → ______
+## 0. 结论（2026-08-03 首轮 arXiv 检索后更新）
+- [x] 是否已有工作做 **dynamic density-state evolution for sequential recommendation**？→ **未发现直接先例**（arXiv 检索范围内）：density matrix 用于推荐的工作（ConQAR、WWW 2026、quantum-inspired algorithms）都是**静态 / 非序列 / 算法加速**；Gaussian/distributional embedding 系列虽已用于序列，但**不是 density operator、演化无硬约束**。
+- [x] 是否已有工作做 **legality-preserving preference transition**？→ **未发现**：interest drift 建模（HCRNN、PERIS 等）均为向量/RNN 门控，无 PSD+trace 硬约束。
+- ✅ **动态密度状态演化 = 空白点（可作核心卖点）**；但论文需明确与 **ConQAR**（density matrix 表示，非序列非动态）和 **Gaussian embedding 系列**（不确定性表示，非算子态）划清界限。
+- ⚠️ 本结论基于 arXiv 首轮检索；投稿前需再用 Semantic Scholar / DBLP / Google Scholar 复核（见 §4）。
 
 ---
 
@@ -16,8 +17,11 @@
 
 | 代表工作 | 核心做法 | 静态 or 动态状态 | 是否覆盖"序列演化" | 与我们差异 |
 |---|---|---|---|---|
-| WWW 2026 *Quantum-enhanced Representation Learning and Matching Learning for Recommendation* | 用户表示为一阶密度算子，量子表示 + 量子匹配（static CF） | **静态** $\rho_u$ | ❌ 无序列/时间维 | 我们引入 $\rho_1\to\rho_T$ 动态演化 + 保合法性转移 |
-| （待调研）density-matrix 用于推荐的其他工作 | ______ | ______ | ______ | ______ |
+| **ConQAR**（arXiv 1912.11720, ICTIR'19 WS） | quantum-like **density matrix layer** 捕获卷积特征交互，用于**评论评分预测（rating）** | 静态（用户/物品各一表示） | ❌ 非序列、非动态 | 我们做**序列 next-item + 动态演化**；它是基于文本评论的评分 |
+| WWW 2026 *Quantum-enhanced Repr. & Matching for Rec* | 用户表示为一阶密度算子 + 量子匹配（static CF） | **静态** $\rho_u$ | ❌ 无序列/时间维 | 我们引入 $\rho_1\to\rho_T$ 动态演化 + 保合法性转移 |
+| Quantum-inspired algorithms（Kerenidis-Prakash / E. Tang 等） | 低秩矩阵近似、采样加速（复杂度） | 非表示学习 | ❌ | 属算法加速，非表示/序列建模 |
+| VBAE（arXiv 2105.07597） | 高斯潜变量 + **quantum-inspired uncertainty 度量**（hybrid CF） | 静态 | ❌ | 不确定性度量启发，非 density-state 序列演化 |
+| Quantum-theory-inspired rec（arXiv 1601.06035） | 量子模型 / PSD 因子化做 item 推荐 | 静态 | ❌ | 理论动机启发，非序列状态演化 |
 
 ---
 
@@ -25,12 +29,13 @@
 
 | 代表工作 | 核心做法 | 是否动态 | 状态约束（PSD/trace） | 与我们差异 |
 |---|---|---|---|---|
-| Gaussian embedding 类 | $z\sim\mathcal N(\mu,\Sigma)$，KL / 内积打分 | 多为静态 | ❌ 无硬约束 | 我们用二阶算子状态 + 恒保合法演化 |
-| Bayesian / distributional rec | $p(z)$ 分布表示 | 部分 | ❌ | 演化无结构化约束 |
-| uncertainty-aware sequential rec | 不确定性感知的序列模型 | 有 | ❌ | 无 density 状态 / 保合法演化 |
-| （待调研）______ | ______ | ______ | ______ | ______ |
+| **CGE**（IJCAI 2019, arXiv 2006.10932） | Gaussian embedding（$\mu,\Sigma$）+ MC 采样打分 | 静态 | ❌ 仅协方差正定，非 density 算子 | 我们用 density operator（二阶含相关性）+ 演化保合法 |
+| **W-GAT**（IEEE TCSS, arXiv 2404.05962） | GCN 中 Gaussian embedding，Wasserstein 距离（CF） | 静态 | ❌ | 分布相似度，无状态演化 |
+| **G-STO**（arXiv 2306.14314） | **序列**推荐 + Gaussian embedding 表示意图 + 图正则 | 有（Transformer 编码序列） | ❌ | 表示是 Gaussian 而非 density；演化是 attention 隐式，无 PSD+trace 硬约束 |
+| NEAT（arXiv 2202.05456） | Gaussian embedding 建模互补购买噪声 | 静态 | ❌ | 非序列状态 |
+| uncertainty-aware sequential（arXiv 2508.07210） | 不确定性作用于 **LLM 解码/logit**，非表示层 | 有 | ❌ | 我们是不确定性在**状态表示层** + 演化 |
 
-> ⚠️ 该方向是**最大风险**：必须回答"我们与 Gaussian/distributional 的本质区别"——**受约束（PSD+trace）的状态 + 合法演化**，不是"把向量换成分布"。
+> ⚠️ 该方向是**最大风险**：必须回答"我们与 Gaussian/distributional 的本质区别"——**受约束（PSD+trace）的密度算子状态 + 合法性保持演化**，不是"把向量换成高斯分布"。
 
 ---
 
@@ -38,10 +43,12 @@
 
 | 代表工作 | 核心做法 | 与我们差异 |
 |---|---|---|
-| 偏好漂移 / interest drift 建模 | 动态偏好建模（非量子） | 我们用 density 状态 + 保合法凸组合 |
-| state-space / Bayesian filtering（Kalman 等） | 状态估计演化 | 状态是密度算子，演化是凸组合（EMA/贝叶斯合并语义） |
-| 记忆 / 遗忘机制模型（EMA、门控） | 指数衰减旧兴趣 | 我们在**密度状态空间**上做 EMA，且状态恒合法 |
-| （待调研）______ | ______ | ______ |
+| **HCRNN**（AAAI 2019, arXiv 1904.12674） | 层次 RNN + interest drift 假设，序列推荐 | 漂移用 RNN 门控；我们用 density 状态 + 凸组合（保合法） |
+| **PERIS**（CIKM 2022, arXiv 2209.06644） | 个性化兴趣持续性，建模 interest drift | 向量表示；无算子态约束 |
+| **TAI2Vec**（UMAP 2026, arXiv 2604.15581） | 时间感知 item embedding，区分短期/长期演化 | 表示是向量；非密度状态 |
+| UniRec（CIKM 2024, arXiv 2406.18470）、TGODE（arXiv 2511.18347） | 时间/频域增强偏好演化 | 均为向量/ODE 状态，非 density operator |
+| PaperFlow（arXiv 2606.07454） | 论文推荐中按天更新用户状态建模漂移 | 状态更新无 PSD+trace 约束 |
+| state-space / Bayesian filtering（Kalman） | 状态估计演化 | 我们的状态是密度算子 + 凸组合（EMA/贝叶斯合并语义） |
 
 ---
 
@@ -58,3 +65,19 @@
 > 引用位置/原因：______
 > 与我们差异：______
 ```
+
+---
+
+## 6. 首轮检索记录（2026-08-03，arXiv API）
+
+| 检索式 | 命中数 | 相关命中的代表 |
+|---|---|---|
+| all:"density matrix" AND all:recommendation | 5 | ConQAR（唯一相关）；其余为物理（DMRG/电离） |
+| all:"quantum-inspired" AND all:recommendation | 15 | quantum-inspired algorithms（Tang 等）、VBAE、量子理论启发推荐 |
+| all:"quantum" AND all:recommendation | 462 | 噪声大，多为物理/密码；无序列密度状态 |
+| all:"uncertainty-aware" AND all:"sequential recommendation" | 1 | LLM 解码不确定性（2508.07210） |
+| all:"distributional" AND all:"sequential recommendation" | 97 | 多为生成式/LLM/图方法，非 density 状态 |
+| all:"Gaussian embedding" AND all:recommendation | 5 | CGE、W-GAT、G-STO、NEAT |
+| all:"interest drift" AND all:recommendation | 10 | HCRNN、PERIS、TAI2Vec、UniRec、PaperFlow |
+
+> **待补充**（投稿前复核）：① Semantic Scholar（首轮 429 限流）；② DBLP / Google Scholar；③ WWW 2026 那篇原文与引用链；④ "density operator" / "quantum state" + sequential 的更多组合。
