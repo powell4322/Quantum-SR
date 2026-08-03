@@ -16,13 +16,14 @@
 
 ## 2. Baseline（2026-08-03 二次定稿：四阶递进 + 主表 6 个）
 
-**四阶递进逻辑（核心叙事：Vector < Density Feature < Density State < Dynamic）**
-| 阶梯 | Baseline / 变体 | 回答 | RQ |
-|---|---|---|---|
-| A | Vector（SASRec） | 基准 | - |
-| B | **Density Feature**（模拟 DMPEN：$ee^\top$→flatten→SASRec） | density representation 是否有效 | RQ1 |
-| C | Density State static（$\rho_T$） | state 是否有效 | RQ1 |
-| D | Density Dynamic（凸组合演化，最终模型） | 动态演化是否有效 | **RQ2** |
+**递进逻辑（核心叙事：V < VE < DF < DS < DDS）**
+| 编号 | Baseline / 变体 | 是否 density | 是否 evolution | 回答 |
+|---|---|---|---|---|
+| V | Vector（SASRec） | ❌ | ❌ | 基准 |
+| VE | **Vector Evolution**（$h_{t+1}=\alpha h_t+(1-\alpha)e_i$） | ❌ | ✅ | **换空间对照** |
+| DF | Density Feature（模拟 DMPEN：$ee^\top$→flatten→SASRec） | ✅ feature | ❌ | density 表示是否有效 |
+| DS | Static Density State（$\rho_T=\mathrm{Proj}(h_T)$） | ✅ state | ❌ | state 是否有效 |
+| DDS | Dynamic Density State（凸组合演化） | ✅ state | ✅ | 动态演化是否有效 |
 
 **主表 baseline（6 个）**
 | baseline | 说明 | 状态 |
@@ -40,10 +41,10 @@
 
 | RQ | 实验 | 对比（同参数量） | 指标 |
 |---|---|---|---|
-| RQ1 | E001 | Vector(A) vs Density Feature(B) vs Density State static(C) | NDCG@10 / HR@10 |
-| RQ2 | E002 | static(C) vs dynamic(D)；E003 α 扫描 0.1–0.9 | NDCG@10 / HR@10 |
+| RQ1 | E001 | V vs VE vs DF vs DS | NDCG@10 / HR@10 |
+| RQ2 | E002 | DS vs DDS；E003 α 扫描 0.1–0.9 | NDCG@10 / HR@10 |
 | RQ3 | E004 | remove PSD / remove trace / unconstrained matrix | NDCG@10 / HR@10 |
-| RQ4 | E005 | entropy $H(\rho)$ 分析 + interest-shift（前 50 A → 后 50 B） | entropy / adaptation steps |
+| RQ4 | E005 | entropy 分组（低/中/高）+ interest-shift（前 50 A → 后 50 B） | entropy / adaptation steps |
 
 ## 4. 分析实验（附）
 

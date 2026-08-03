@@ -62,48 +62,72 @@
 
 ---
 
+## 2.5 核心对象定义：Preference Density State（2026-08-03 概念闭环）
+
+三个易混淆概念，必须区分：
+| 概念 | 含义 | DMPEN | 我们 |
+|---|---|---|---|
+| Density Feature | 一种表示形式（item 特征） | ✅ 核心 | ❌ 非核心 |
+| Density Embedding | item/user embedding 的二阶扩展 | 部分涉及 | 非核心 |
+| **Preference Density State** | **动态兴趣状态**（概率状态） | ❌ | ✅ **核心** |
+
+**定义**：用户兴趣不是一个向量，而是一个概率状态 $\rho_t$，满足：
+- **PSD**：$\rho_t\succeq0$
+- **归一**：$\mathrm{Tr}(\rho_t)=1$（density operator space）
+
+**直观**：$h_t$ 表示"用户现在喜欢什么"；$\rho_t$ 表示"用户现在**可能有哪些**兴趣，以及每个兴趣的**不确定性**"。
+
+**与 DMPEN 的本质区别**：DMPEN 的 $\rho=e_ie_i^\top$ 只是"更丰富的 item feature"（无状态概率意义、无时间演化约束、无 PSD/trace 讨论、无不确定性解释）；我们的 $\rho_t$ 是**有约束的偏好状态** + **保合法性演化**。
+
+---
+
 ## 3. Contribution（贡献声明，每条绑定证据）
 
-> 贡献按重要度排序（2026-08-03 二次定稿：C2 唯一核心；C1 强调 state transition；C3 改为 uncertainty modeling）。
+> 贡献按重要度排序（2026-08-03 概念闭环定稿：C1 problem formulation → C2 legality → C3 uncertainty 分析）。
 
 | # | 贡献（英文定稿） | 对应模块 / 证据 | 回答 |
 |---|---|---|---|
-| **C1（★★）** | **Preference evolution as constrained density-state transition**：把用户兴趣演化建模为满足量子态约束（PSD+trace）的概率状态转移过程（而非"首次用 density 表示"）。*We formulate user preference evolution as a constrained density state transition process.*（关键词：state transition，不是 representation） | `StateProjection` + `StateTransition`；03_theory §2/§3；E001-E003 | RQ1/RQ2 |
-| **C2（★★★ 唯一核心）** | **Legality-preserving evolution**：保 PSD+trace 的凸组合状态演化（传统 hidden state 无约束：norm explosion / uninterpretable / arbitrary transition）。*We propose a legality-preserving preference transition mechanism based on convex density-state evolution.*（理论贡献） | `StateTransition`；03_theory §3；E004（约束消融） | RQ3（Theory） |
-| **C3（★★）** | **Preference uncertainty modeling**：density 谱 = 多兴趣同时存在（mixture），比 vector 更能表达兴趣不确定性/竞争。*Density states capture multiple concurrent interests via their spectrum, providing interpretable preference uncertainty.*（对 WWW reviewer 最易接受；配合 entropy 分析） | 谱分解 + entropy $H(\rho)=-\mathrm{Tr}(\rho\log\rho)$；RQ4 | RQ4 |
+| **C1（★★★）** | **Preference state evolution formulation**：把序列推荐建模为**受约束的偏好状态演化问题**（用户兴趣表示为归一化密度状态）。*We formulate sequential recommendation as a constrained preference state evolution problem, where user interests are represented as normalized density states.*（problem formulation，非"引入 density"） | `StateProjection` + `StateTransition`；03_theory §2/§3；E001-E003 | RQ1/RQ2 |
+| **C2（★★★ 唯一核心）** | **Legality-preserving transition**：保 PSD+trace 的转移机制，保证演化中每步都是合法偏好状态。*We design a legality-preserving transition mechanism that guarantees valid preference states during evolution.*（理论贡献：convex interpolation 保持合法性） | `StateTransition`；03_theory §3；E004（约束消融） | RQ3（Theory） |
+| **C3（★★，需实验验证）** | **Uncertainty analysis**：用 von Neumann entropy 分析用户兴趣不确定性。*We analyze preference uncertainty via von Neumann entropy.* ⚠️ **必须由 entropy 分组实验支撑**（低/中/高 entropy 用户，DDS 提升是否集中于 high-entropy），否则 C3 删除 | entropy 分组实验；RQ4 | RQ4 |
 
 > 写作注意：**不得写"首次 density"**；必须显式写 *Different from DMPEN that uses density matrices as second-order feature representations for RNNs, we investigate density operators as dynamic preference states with explicit legality-preserving evolution.*
 
-## 3.5 Method 数学定义冻结（2026-08-03 定稿，先冻结再实验）
-- **状态**：$\rho_t = \dfrac{L_t L_t^\top}{\mathrm{Tr}(L_t L_t^\top)}$，$L_t=\mathrm{Linear}(h_t)\in\mathbb{R}^{d\times r}$（PSD + trace=1）。
-- **演化（transition）**：$\rho_{t+1}=\alpha\,\rho_t+(1-\alpha)\,\rho_{i_t}$，固定 $\alpha$（扫描 0.1–0.9）为主；learnable/adaptive 作 extension。
-- **打分（score）**：$s(u,i)=\mathrm{Tr}(\rho_u\rho_i)$（Hilbert–Schmidt / operator-level kernel）。
-- **损失（loss）**：**主 = BPR** $-\log\sigma(s^+-s^-)$（与 SASRec/BERT4Rec/GRU4Rec 可比）；**消融 = BCE**（配合 logit 变换）；fidelity loss 作 quantum-specific ablation。
-- ⚠️ static vs dynamic 公平性：二者基于**相同** SASRec 编码器输出 $h_t$，仅差"演化"操作（见 §4.1），对比公平。
+## 3.5 Method 数学定义 v3（2026-08-03 概念闭环定稿，先冻结再实验）
+
+1. **Item density state（构造）**：$\rho_i = \mathrm{Proj}(e_i) = \dfrac{L_i L_i^\top}{\mathrm{Tr}(L_i L_i^\top)}$，$L_i=\mathrm{Linear}(e_i)\in\mathbb{R}^{d\times r}$（rank 可控、PSD+trace=1）。
+2. **User state projection**：$\rho_t=\mathrm{Proj}(h_t)$，$h_t=f_\theta(S_{\le t})$（SASRec 编码器输出）。
+3. **初始状态**：$\rho_0=\frac{I}{d}$（最大混合态 = 无信息先验）。
+4. **演化（transition）**：$\rho_{t+1}=\alpha\,\rho_t+(1-\alpha)\,\rho_{\text{obs}}$，其中 $\rho_{\text{obs}}=\mathrm{Proj}(h_{t+1})$（当前观测+上下文诱导的状态）；固定 $\alpha$（扫描 0.1–0.9）为主，learnable/adaptive 作 extension。→ **convex interpolation 保持合法性**（PSD 凸锥 + trace 线性）。
+5. **打分（score）**：$s(u,i)=\mathrm{Tr}(\rho_u\rho_i)$（Hilbert–Schmidt / operator-level kernel；$\rho_u$ 用演化末状态 $\rho_T$）。
+6. **损失（loss）**：**主 = BPR** $-\log\sigma(s^+-s^-)$；**消融 = BCE**（logit 变换，probabilistic interpretation）；**fidelity** 作 theoretical ablation。
+7. **熵（entropy）**：$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$——低熵=兴趣集中，高熵=兴趣多元（用于 RQ4 分组分析）。
+8. ⚠️ static vs dynamic 公平性：static = $\rho_T=\mathrm{Proj}(h_T)$（无演化）；dynamic = 演化得到 $\rho_T$。二者输入**相同**（同一 $h_t$ 序列），仅差"演化"操作 → 对比公平。
 
 ---
 
 ## 4. 实验路线（Experiment Line）
 
-### 4.1 主实验：四阶递进逻辑（2026-08-03 二次定稿）
-> 核心叙事：**Vector < Density Feature < Density State < Dynamic Evolution**——把"DMPEN 的 density 提升"与"我们的 state/evolution 提升"逐步拆开。
+### 4.1 主实验：递进逻辑 + Vector Evolution 对照（2026-08-03 概念闭环定稿）
+> 核心叙事：**V < VE < DF < DS < DDS**——逐步拆开"density feature 提升"、"state 提升"、"evolution 提升"，并加 **Vector Evolution** 回应"只是换了空间"。
 
-| 阶梯 | Baseline / 变体 | 回答 | RQ |
-|---|---|---|---|
-| A | **Vector**（SASRec，embedding→SASRec） | 基准 | - |
-| B | **Density Feature**（模拟 DMPEN：$ee^\top$→flatten→SASRec） | density representation 是否有效 | RQ1 |
-| C | **Density State static**（$\rho_T$，不演化） | state 是否有效 | RQ1 |
-| D | **Density Dynamic**（$\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_i$，最终模型） | 动态演化是否有效 | **RQ2** |
+| 编号 | Baseline / 变体 | 是否 density | 是否 evolution | 回答 |
+|---|---|---|---|---|
+| V | **Vector**（SASRec） | ❌ | ❌ | 基准 |
+| VE | **Vector Evolution**（$h_{t+1}=\alpha h_t+(1-\alpha)e_i$） | ❌ | ✅ | **换空间对照**：matrix evolution 比 vector evolution 值在哪 |
+| DF | **Density Feature**（模拟 DMPEN：$ee^\top$→flatten→SASRec） | ✅ feature | ❌ | density 表示是否有效 |
+| DS | **Static Density State**（$\rho_T=\mathrm{Proj}(h_T)$） | ✅ state | ❌ | state 是否有效 |
+| DDS | **Dynamic Density State**（演化 $\rho_T$，最终模型） | ✅ state | ✅ | 动态演化是否有效 |
 
-**RQ 定义（2026-08-03 二次定稿）**
-- RQ1 **Representation**：density state 是否优于 vector / density feature？（A vs B vs C）
-- RQ2 **Evolution**：动态演化是否优于静态？（C vs D）
+**RQ 定义（2026-08-03 概念闭环定稿）**
+- RQ1 **Representation**：density state 是否优于 vector / density feature？（V vs DF vs DS）
+- RQ2 **Evolution**：动态演化是否优于静态？（DS vs DDS；且 VE vs V 排除"任何凸组合都有用"）
 - RQ3 **Theory**：PSD+trace 约束是否重要？（消融：remove PSD / remove trace / unconstrained matrix）
-- RQ4 **Uncertainty**：density 为何有效？（$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$ 熵分析用户兴趣变化）
+- RQ4 **Uncertainty**：density 为何有效？（entropy 分组：低/中/高 $H(\rho)$ 用户，DDS 提升是否集中于 high-entropy）
 
-**主表 baseline（6 个，不多加）**：GRU4Rec / SASRec / BERT4Rec / **DMPEN** / Ours-static / Ours-dynamic
+**主表 baseline（6 个，不多加）**：GRU4Rec / SASRec / BERT4Rec / **DMPEN** / DS / DDS
 > 暂缓：Caser / Gaussian / MIND / ComiRec（先证明 idea）。
-> 公平性：static 与 dynamic 基于**相同**编码器输出，仅差演化操作（信息量相同）。
+> 公平性：DS 与 DDS 基于**相同**编码器输出，仅差演化操作（信息量相同）。
 
 ### 4.2 附实验（增强证据）
 | 分析 | 内容 | 目的 |
@@ -142,6 +166,7 @@
 | 2026-08-03 | DMPEN 精读（GPT） | 发现 DMPEN(DASFAA 2019) 已做 density matrix + RNN 序列演化 → **"首次 density+sequential" 不成立**；创新点迁移到 "dynamic density state evolution + legality"；必须加 DMPEN baseline；标题避免撞车 | 全部采纳：§1/§2/§3/§4 已改；04_related_work 记入 DMPEN 详情；定位改为"density 状态机 vs 特征" | 避免被 2019 论文直接击穿 |
 | 2026-08-03 | 定位定稿（GPT） | ① 冻结论文定位（不继续扩实验/代码）；② C1 降级、C2 唯一核心；③ 主表 baseline 精简为 6 个（GRU4Rec/SASRec/BERT4Rec/DMPEN/Ours-static/dynamic），Caser/Gaussian/MIND 暂缓；④ 实验重设计（E000 DMPEN 复现 + E001-E004）；⑤ adaptive α 不核心（fixed α 扫描 0.1–0.9）；⑥ Loss 主=logit+BCE、ablation=BPR；⑦ 03_theory 删 Kraus/depolarization/Born，保留 P1/P2/P3 | 全部采纳：§1/§2/§3/§4 重写为英文定稿；05/03 同步 | 创新叙事收紧，防"DMPEN 已做"攻击 |
 | 2026-08-03 | 二次定位 review（GPT） | ① 强化"动态概率状态/uncertainty"叙事、弱化 quantum；② C1 改 state transition、C3 改 uncertainty modeling；③ **主损失改 BPR**（BCE 消融）；④ 实验改四阶递进（Vector<Density Feature<Density State<Dynamic）+ RQ1-4 + entropy 分析；⑤ 标题无 quantum；⑥ 先冻结 Method 数学定义再实验 | 全部采纳：§1.2/§3/§3.5/§4 更新；`--loss` 默认改 bpr | 叙事最稳、可比性最强 |
+| 2026-08-03 | 概念闭环 review（GPT） | ① 定义核心对象 Preference Density State（区分 feature/embedding/state）；② C1 改 problem formulation、C3 需 entropy 实验验证；③ Method v3 冻结（item/ρ0/transition/scoring/loss BPR/entropy）；④ 加 **Vector Evolution** baseline 回应"只是换空间"；⑤ 实验改名 V/VE/DF/DS/DDS | 全部采纳：§2.5/§3/§3.5/§4 更新 | 概念闭环，防"convex combination 太简单"攻击 |
 
 ---
 
