@@ -56,6 +56,7 @@ def run_one(args, variant, rank):
         "--state_rank", str(rank),
         "--transition", args.transition,
         "--eval_every", str(args.eval_every),
+        "--loss", args.loss,
     ]
     name = "{}_r{}".format(variant, rank)
 
@@ -101,6 +102,7 @@ def main():
     parser.add_argument("--num_heads", type=int, default=1)
     parser.add_argument("--dropout_rate", type=float, default=0.2)
     parser.add_argument("--eval_every", type=int, default=20)
+    parser.add_argument("--loss", default="bce", choices=["bce", "bpr"])
     args = parser.parse_args()
 
     os.makedirs("results", exist_ok=True)

@@ -124,21 +124,15 @@ $$\rho_{t+1}=\alpha_t\,\rho_t+(1-\alpha_t)\,\rho_{i_t},\qquad 0\le\alpha_t\le 1$
   - 对比表：`fixed alpha`（固定标量，baseline）→ `learnable scalar alpha`（全局可学习标量，**当前代码已支持**）→ `adaptive alpha_t`（逐用户/逐步门控，**待实现**）；
   - 风险：可学习 $\alpha$ 是否坍缩到 0/1、梯度是否稳定（见 §4.5 开放清单）。
 
-### 4.4 ⚠️ 重要发现：Tr 打分与 BCEWithLogitsLoss 不匹配（2026-08-02，需修正）
+### 4.4 ⚠️ Tr 打分与 BCE 不匹配 —— 已修正（2026-08-03 实现）
 
-**现象**：5 轮快速对比中 `state/dynamic` 的 loss 明显高于 `vector`（~1.23 vs 0.91），指标低 ~20%。
+**问题**：5 轮快速对比中 `state/dynamic` 的 loss 明显高于 `vector`（~1.23 vs 0.91）。原因：$\mathrm{Tr}(\rho_u\rho_i)\in[0,1]$，而 `BCEWithLogitsLoss` 期望无界 logits（正样本损失下界 ≈0.313、负样本 ≈0.693、梯度区分度差）。
 
-**原因分析**：$\rho_u,\rho_i$ 均为密度矩阵时 $\mathrm{Tr}(\rho_u\rho_i)\in[0,1]$（§4.2 已证明纯态下即平方余弦），而 `BCEWithLogitsLoss` 期望**无界 logits**。logits 被压在 $[0,1]$ 时：
-- 正样本损失下界 $\approx -\log\,\mathrm{sigmoid}(1)\approx 0.313$，永远降不到 0；
-- 负样本在 0 附近损失 $\approx 0.693$；
-- 梯度区分度差 → 收敛慢、指标低。
+**修正（2026-08-03 已实现）**：`model.py` 对 state/dynamic 的 HS 相似度做 **logit 变换**（`_logit_score`，$z=\log\frac{s+\epsilon}{1-s+\epsilon}$，$\epsilon=10^{-7}$）；`main.py` 支持 `--loss bce|bpr`（主=**bce**，消融=**bpr**：$-\log\sigma(s^+-s^-)$）。
 
-**候选修正（待选定后改代码）**：
-1. **logit 变换**：$\text{logits}' = \log\frac{Tr}{1-Tr}$（数值 clamp），保持 BCE 管线不变；
-2. **温度缩放**：让 logits 分布跨越 0；
-3. **fidelity loss**（量子 ML 惯例）：正样本 $-\log\mathrm{Tr}(\rho_u\rho_i)$，负样本 $-\log(1-\mathrm{Tr})$——语义最贴合"态重叠"。
+**验证（ml-1m，1-epoch quick，CPU）**：冒烟测试通过；dynamic+bce 1-epoch loss **1.24 → 1.08**（改善）；dynamic+bpr loss ~0.43（正常收敛）。
 
-**结论**：当前结果**不能**说明 idea 不成立；需修正打分/损失后再在 GPU 上验证。
+**结论**：打分/损失已修正，可进入正式实验（GPU）。
 
 ### 4.5 理论清单（开放问题）
 
@@ -248,7 +242,7 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 | 2026-08-02 | run_experiments.py | 批量跑多方案并汇总指标 | 见 §5.6 |
 | 2026-08-02 | test_smoke.py | 冒烟测试：验证三种 variant 的 forward/predict/backward 与密度矩阵合法性 | ✅ 已通过（PSD + trace=1 校验） |
 | 🔜 待做 | model.py | 实现 `dynamic-adaptive`：$\alpha_t=\sigma(W[h_t;e_{i_t}]+b)$ | 贡献2，见 §4.3 |
-| 🔜 待做 | model.py / main.py | 修正 Tr 打分与损失兼容（§4.4 决策：logit 变换 / 温度 / fidelity loss） | 先定方案再改码 |
+| ✅ 2026-08-03 | model.py / main.py / run_experiments.py | Tr 打分修正：state/dynamic 打分做 logit 变换；`--loss bce|bpr` 可切换 | 冒烟通过；1-epoch loss 1.24→1.08 |
 
 ### 运行环境
 
@@ -262,7 +256,7 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 ## 8. 下一步（Next Steps，按优先级）
 
 ### Priority 1（必须先做，否则投稿无望）
-1. [ ] 修正 §4.4：选定 Tr 打分与损失兼容方案（logit 变换 / 温度 / fidelity loss）并改码。
+1. [x] 修正 §4.4：logit 变换 + `--loss bce|bpr`（2026-08-03 已实现）
 2. [ ] 复现 `vector` 基线（ml-1m，正式超参），记录 E001。
 3. [ ] 跑 `state`（RQ1：vector vs state，**同参数量**对照）。
 4. [ ] 跑 `dynamic`（RQ2：static vs dynamic，核心贡献点，用 learnable $\alpha$）。

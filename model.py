@@ -140,6 +140,14 @@ class SASRec(torch.nn.Module):
             rho_seq = torch.stack(outputs, dim=1)
         return rho_seq
 
+    @staticmethod
+    def _logit_score(s, eps=1e-7):
+        """把 [0,1] 的 Tr 相似度分数映射到无界 logits（logit 变换），
+        兼容 BCEWithLogitsLoss 与 BPR（Tr 是密度矩阵 HS 内积 ∈[0,1]）。
+        2026-08-03：修正 Tr/BCE 不匹配问题（见 docs/02_research_log.md §4.4）。"""
+        s = torch.clamp(s, eps, 1.0 - eps)
+        return torch.log(s / (1.0 - s))
+
     def log2feats(self, log_seqs): # TODO: fp64 and int64 as default in python, trim?
         seqs = self.item_emb(torch.LongTensor(log_seqs).to(self.dev))
         seqs *= self.item_emb.embedding_dim ** 0.5
@@ -179,8 +187,8 @@ class SASRec(torch.nn.Module):
             rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
             rho_pos = self.state_proj(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))  # (U, T, C, C)
             rho_neg = self.state_proj(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
-            pos_logits = (rho_seq * rho_pos).sum(dim=(-1, -2))  # Tr(rho_seq * rho_pos)
-            neg_logits = (rho_seq * rho_neg).sum(dim=(-1, -2))
+            pos_logits = self._logit_score((rho_seq * rho_pos).sum(dim=(-1, -2)))  # Tr → logits
+            neg_logits = self._logit_score((rho_seq * rho_neg).sum(dim=(-1, -2)))
         else:
             pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
             neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
@@ -201,7 +209,7 @@ class SASRec(torch.nn.Module):
             rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) only use last state
             item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
             rho_item = self.state_proj(item_embs)  # (U, I, C, C)
-            logits = (rho_user * rho_item).sum(dim=(-1, -2))  # Tr(rho_user * rho_item)
+            logits = self._logit_score((rho_user * rho_item).sum(dim=(-1, -2)))  # Tr → logits
         else:
             final_feat = log_feats[:, -1, :] # only use last QKV classifier, a waste
 
