@@ -12,7 +12,7 @@ user-invocable: true
 
 ## 密度矩阵合法性（铁律，任何实现必须满足）
 1. Hermitian；2. 半正定（PSD）；3. $\mathrm{Tr}(\rho)=1$。
-- **构造**：$\rho = LL^\top/\mathrm{Tr}(LL^\top)$，$L=\mathrm{Linear}(h)\in\mathbb{R}^{d\times r}$（低秩 Cholesky-like）。$r=1$ 纯态、$r>1$ 混合态；⚠️ 谱分解是"偏好不确定性的潜在分解"，**不承诺每个特征向量=一个兴趣**（RESEARCH_LOG §4.1）。实现见 `model.py::StateProjection`，合法性已由 `test_smoke.py` 校验。
+- **构造**：$\rho = LL^\top/\mathrm{Tr}(LL^\top)$，$L=\mathrm{Linear}(h)\in\mathbb{R}^{d\times r}$（低秩 Cholesky-like）。$r=1$ 纯态、$r>1$ 混合态；⚠️ 谱分解是"偏好不确定性的潜在分解"，**不承诺每个特征向量=一个兴趣**（`docs/02_research_log.md` §4.1）。实现见 `model.py::StateProjection`，合法性已由 `test_smoke.py` 校验。
 - **演化**：凸组合 $\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$ 保 PSD + trace（PSD 是凸锥），对应"信息注入式去极化"。实现见 `model.py::StateTransition`。
 
 ## 打分与损失（当前最重要的已知问题）

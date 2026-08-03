@@ -224,7 +224,7 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 
 ## 6. 实验结果日志（表格，实验后追加）
 
-> ⚠️ **可读性提示**：E000 三行受 §4.4 的 Tr/BCE 不匹配影响，**不代表** idea 无效；修正打分/损失后需重测并覆盖。另一对话正在跑的小型测试结果，完成后按相同格式追加到本表。
+> ⚠️ **可读性提示**：E000 三行为 quick sanity check（5 轮、CPU、小超参），受 §4.4 的 Tr/BCE 不匹配影响，**不代表** idea 无效；其原始输出文件（`ml-1m_quant_*_quick/`、`results/exp_quick.csv`）已清理（2026-08-03）。正式结论以修正打分/损失后的 E001+ 为准。
 
 | 实验ID | 日期 | variant | state_rank | 其它配置 | NDCG@10 | HR@10 | 相对 baseline | 结论 / 下一步 |
 |---|---|---|---|---|---|---|---|---|
