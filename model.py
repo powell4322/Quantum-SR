@@ -125,16 +125,17 @@ class SASRec(torch.nn.Module):
 
     def _to_state_sequence(self, log_feats):
         """把 (U, T, C) 的向量序列转成 (U, T, C, C) 的密度矩阵序列；
-        dynamic 变体再沿时间维做凸组合演化。"""
+        dynamic 变体再沿时间维做凸组合演化（ρ_0 = I/d，见 docs/09_theory_v1.md）。"""
         rho_seq = self.state_proj(log_feats)  # (U, T, C, C)
         if self.variant == 'dynamic':
             T = rho_seq.shape[1]
+            C = rho_seq.shape[-1]
             outputs = []
-            prev = None
+            # ρ_0 = I/d（最大混合态先验）
+            prev = (torch.eye(C, device=rho_seq.device) / C).unsqueeze(0).expand(rho_seq.shape[0], -1, -1)
             for t in range(T):
                 cur = rho_seq[:, t]  # (U, C, C)
-                if prev is not None:
-                    cur = self.state_transition(prev, cur)
+                cur = self.state_transition(prev, cur)
                 outputs.append(cur)
                 prev = cur
             rho_seq = torch.stack(outputs, dim=1)

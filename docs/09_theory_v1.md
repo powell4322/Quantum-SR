@@ -24,13 +24,16 @@ $$\rho_t\in\mathcal{D}_d:=\{\rho\in\mathbb{R}^{d\times d}\mid \rho=\rho^\top,\ \
 
 ---
 
-## 3. 状态构造：StateProjection（Proj）
+### 3. 状态构造：StateProjection（Proj / density-state constructor）
 
-$$\mathrm{Proj}(h)=\frac{LL^\top}{\mathrm{Tr}(LL^\top)},\qquad L=W h\in\mathbb{R}^{d\times r}\ (W\ \text{可学习})$$
+$$\mathrm{Proj}(h)=\frac{LL^\top}{\mathrm{Tr}(LL^\top)},\qquad L=\mathrm{reshape}(W h)\in\mathbb{R}^{d\times r}$$
 
+- **维度（v1.1 修正，与代码一致）**：$h\in\mathbb{R}^d$，$W\in\mathbb{R}^{(dr)\times d}$（线性层输出 $dr$ 维），$\mathrm{reshape}(Wh)$ 成 $L\in\mathbb{R}^{d\times r}$；实现中为 $L\in\mathbb{R}^{r\times d}$、$\rho=L^\top L$，数学等价。
 - $r$ = 低秩参数（$r=1$ 纯态 / $r>1$ 混合态），rank 可控。
-- 数值：对 $\mathrm{Tr}(LL^\top)$ 加 $\mathrm{clamp}(\cdot,10^{-8})$ 防除零（默认 $L\ne0$）。
-- item 状态：$\rho_i=\mathrm{Proj}(e_i)$（与用户状态共享 Proj 或独立，见实验配置）。
+- 数值：对 $\mathrm{Tr}(LL^\top)$ 加 $\mathrm{clamp}(\cdot,10^{-8})$ 防除零（**默认 $L\ne0$**，P1 前提）。
+- ⚠️ **命名**：Proj 是"密度状态构造器"，**并非数学上的投影算子**（论文中写作 $\Phi$ 或 density-state constructor）。
+- item 状态：$\rho_i=\mathrm{Proj}(e_i)$（与用户状态共享或独立 Proj，见实验配置）。
+- **复杂度（v1.1）**：参数增量 $O(dr)$（Proj 层）；打分 $O(d^2)$（$\mathrm{Tr}(\rho_u\rho_i)$ 逐元素乘加）；序列演化 $O(Td^2)$。$d$ 通常 $\le100$，可接受。
 
 **参数量 vs 自由度**：
 - 参数量 $=dr$；
@@ -47,8 +50,9 @@ $$\mathrm{Proj}(h)=\frac{LL^\top}{\mathrm{Tr}(LL^\top)},\qquad L=W h\in\mathbb{R
 
 **演化**（固定 $\alpha\in[0,1]$，主）：
 $$\rho_t=\alpha\,\rho_{t-1}+(1-\alpha)\,\hat\rho_t,\qquad t=1,\dots,T$$
+- **$\alpha$ 设置（v1.1 讨论）**：$\alpha$ 大 → 保留旧兴趣（稳定用户）；$\alpha$ 小 → 快速吸收新兴趣。第一版建议**固定 $\alpha$ 扫描 0.1–0.9**（E003），learnable 作选项；**$\alpha$ 近 1 时首观测 $\hat\rho_1$ 对先验 $I/d$ 的贡献小（权重 $(1-\alpha)$），$\alpha$ 近 0 时近乎忽略先验**——需在实验中观察。
 - learnable / adaptive $\alpha_t=\sigma(W[h_t;e_{i_t}]+b)$ 作 extension（不参与第一版）。
-- **用户状态**：$\rho_u=\rho_T$（演化末状态；聚合变体 $ \rho_u=\sum_t w_t\rho_t $ 为可选对照）。
+- **用户状态**：$\rho_u=\rho_T$（演化末状态；聚合变体 $\rho_u=\sum_t w_t\rho_t$ 为可选对照）。
 
 ---
 
@@ -86,10 +90,11 @@ von Neumann 熵：$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$（$\rho$ 奇异时按惯�
 4. 归纳得 $\forall t$ 合法。∎
 
 ### P2（有界打分）
-**命题**：对任意 $\rho,\sigma\in\mathcal{D}_d$，$0\le\mathrm{Tr}(\rho\sigma)\le1$。
+**命题**：对任意 $\rho,\sigma\in\mathcal{D}_d$，$0\le\mathrm{Tr}(\rho\sigma)\le1$；且 $\mathrm{Tr}(\rho\sigma)=1$ 当且仅当 $\rho=\sigma=|\psi\rangle\langle\psi|$（同一纯态）。
 **证明**：
 - 下界：$\mathrm{Tr}(\rho\sigma)=\mathrm{Tr}(\rho^{1/2}\sigma\rho^{1/2})\ge0$（PSD 之积的迹非负）。∎
 - 上界：HS Cauchy–Schwarz $|\mathrm{Tr}(\rho\sigma)|\le\sqrt{\mathrm{Tr}(\rho^2)\mathrm{Tr}(\sigma^2)}$；且 $\mathrm{Tr}(\rho^2)=\sum_k\lambda_k^2\le(\sum_k\lambda_k)^2=1$（$\lambda_k\ge0$）。故 $\le1$。∎
+- **等号条件（v1.1 补充）**：Cauchy–Schwarz 等号 $\iff\rho,\sigma$ 线性相关；$\mathrm{Tr}(\rho^2)=1\iff\rho$ 为纯态 → $\rho=\sigma=$ 同一纯态时 $=1$（完全匹配的兴趣态，可作为可解释性质）。
 
 ### P3（纯态桥接）
 **命题**：$r=1$ 时 $\rho_u=uu^\top,\rho_i=ii^\top$（$\|u\|=\|i\|=1$），则 $s=\mathrm{Tr}(\rho_u\rho_i)=(u\cdot i)^2=\cos^2\theta$。
@@ -97,28 +102,29 @@ von Neumann 熵：$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$（$\rho$ 奇异时按惯�
 - 意义：$r=1$ 时 state 恰是**平方点积核**（state ⊇ vector 的桥梁）；也解释 $s\in[0,1]$。
 
 ### P4（遗忘 / EMA）
-**命题**：固定 $\alpha$ 时，$\rho_T=\alpha^{T}\frac{I}{d}+(1-\alpha)\sum_{t=1}^{T}\alpha^{T-t}\,\hat\rho_t$。
+**命题**：**固定 $\alpha$** 时，$\rho_T=\alpha^{T}\frac{I}{d}+(1-\alpha)\sum_{t=1}^{T}\alpha^{T-t}\,\hat\rho_t$。
 **证明**：递推展开（归纳）：
 $\rho_1=\alpha\frac{I}{d}+(1-\alpha)\hat\rho_1$；
 假设 $\rho_t=\alpha^t\frac{I}{d}+(1-\alpha)\sum_{k=1}^t\alpha^{t-k}\hat\rho_k$，则 $\rho_{t+1}=\alpha\rho_t+(1-\alpha)\hat\rho_{t+1}=\alpha^{t+1}\frac{I}{d}+(1-\alpha)\sum_{k=1}^{t+1}\alpha^{t+1-k}\hat\rho_k$。∎
 - **推论（遗忘机制）**：较早观测 $\hat\rho_t$ 的权重 $\propto\alpha^{T-t}$ 随 $T-t$ 指数衰减 → 旧兴趣自然遗忘。
 
 ### P5（初始态最大熵）
-**命题**：$\rho_0=I/d$ 是 $\mathcal{D}_d$ 中熵最大的状态，$H(\rho_0)=\log d$。
+**命题**：在 $\mathcal{D}_d$ 中，$\rho_0=I/d$ 是熵最大的状态，$H(\rho_0)=\log d$。
 **证明**：von Neumann 熵是凹函数，在均匀分布（$I/d$）取最大 $\log d$（Jensen）。∎
 
 ---
 
-## 9. 猜想（Conjectures，合理 + 待实验验证）
+## 9. 假设（Hypotheses，实验可验证；v1.1：由"猜想"改为"假设"）
 
-| # | 猜想 | 合理理由 | 验证实验 |
+| # | 假设 | 合理理由 | 验证实验 |
 |---|---|---|---|
-| **C1** 表示优势 | 同参数量下，DS/DDS 优于 V/DF（RQ1） | second-order 结构（P3）+ rank 可控（§3） | E001 |
-| **C2** 演化优势 | DDS 优于 DS（RQ2） | 显式遗忘/惯性（P4）+ 合法演化（P1） | E002 |
-| **C3** 约束价值 | 移除 PSD/trace 后性能下降（RQ3） | 合法性约束排除病态演化（norm explosion 等） | E004（消融） |
-| **C4** 不确定性关联 | 高熵用户上 DDS 增益更大（RQ4） | 高熵=兴趣多元=更需要概率状态表达 | entropy 分组 |
+| **H1** 表示优势 | 同参数量下，DS/DDS 优于 V 与 DF（RQ1） | second-order 结构（P3）+ rank 可控（§3） | E001 |
+| **H2** 演化优势 | DDS 优于 DS（RQ2） | 显式遗忘/惯性（P4）+ 合法演化（P1） | E002 |
+| **H3** 约束价值 | 移除 PSD/trace 后性能下降（RQ3） | 合法性约束排除病态演化（norm explosion 等）；⚠️ 去约束后状态无界、得分尺度变，需重调损失 | E004（消融） |
+| **H4** 不确定性关联 | 高熵用户上 DDS 增益更大（RQ4） | 高熵=兴趣多元=更需要概率状态表达 | entropy 分组 |
 
-> 猜想是"合理假设"，须由实验证实或证伪；若 C3/C4 不成立，相应贡献删除/弱化。
+> **baseline 名称（v1.1 明确）**：**V** = SASRec dot product；**DF** = density feature（DMPEN 式，$ee^\top$→flatten→SASRec）；**DS** = 直接用 $\hat\rho_T=\mathrm{Proj}(h_T)$ 作 $\rho_u$（无演化）；**DDS** = 演化得到 $\rho_u$；**VE** = vector evolution（$h_{t+1}=\alpha h_t+(1-\alpha)e_i$）。
+> 假设须由实验证实或证伪；若 H3/H4 不成立，相应贡献删除/弱化。
 
 ---
 
