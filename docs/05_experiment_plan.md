@@ -52,7 +52,7 @@
 ## 5. 铁律（违反则结论作废）
 - 除被验证维度外**同超参**（lr/batch/maxlen/hidden/blocks/heads/dropout/epochs）；
 - **Tr/BCE 兼容修正落地后**（temperature 或 logit 变换）再跑正式实验；
-- 结果一律回填 `docs/RESEARCH_LOG.md` §6 + `docs/PAPER_PROGRESS.md` §4，并更新本表"状态"。
+- 结果一律回填 `docs/02_research_log.md` §6 + `docs/01_paper_progress.md` §4，并更新本表"状态"。
 
 ## 6. GPU 服务器运行
 ```bash

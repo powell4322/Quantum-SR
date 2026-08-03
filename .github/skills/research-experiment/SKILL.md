@@ -34,7 +34,7 @@ user-invocable: true
 - 同一配置复跑以覆盖更新；不同配置必须换实验行并注明。
 
 ## 记录协议（每次实验必做）
-1. 把结果回填到 `docs/RESEARCH_LOG.md` §6 表格（日期/variant/配置/NDCG/HR/相对基线/结论）。
+1. 把结果回填到 `docs/02_research_log.md` §6 表格（日期/variant/配置/NDCG/HR/相对基线/结论）。
 2. 结论栏写清"支撑/否定哪个 RQ"；若结果与预期不符，先查 §4.4 已知问题再下结论。
 3. 更新 §3.2 对应 RQ 的状态（⬜→✅/❌）。
 
@@ -43,11 +43,11 @@ user-invocable: true
 2. 拉取代码：`git clone <url>`（或同步工作区）。
 3. 装依赖：`pip install torch numpy`（GPU 版，按 `nvidia-smi` 的 CUDA 版本选 wheel）。
 4. 跑：`python run_experiments.py --dataset ml-1m --epochs 200 --device cuda`。
-5. 回传 `results/exp_latest.csv` 或指标截图，由助手回填 `docs/RESEARCH_LOG.md`。
+5. 回传 `results/exp_latest.csv` 或指标截图，由助手回填 `docs/02_research_log.md`。
 
 ## 回归
 改 `model.py` 后必跑：`.venv\Scripts\python.exe test_smoke.py`（校验三种 variant 与密度矩阵合法性 PSD+trace=1）。
 
 ## 已知注意事项
-- Tr 打分与 BCE 不匹配问题见 `quantum-seq-rec` skill 与 `docs/RESEARCH_LOG.md` §4.4——正式实验前需确认是否已采用修正方案。
+- Tr 打分与 BCE 不匹配问题见 `quantum-seq-rec` skill 与 `docs/02_research_log.md` §4.4——正式实验前需确认是否已采用修正方案。
 - 修正打分/损失时优先做成可切换参数，避免为每个方案维护独立代码。

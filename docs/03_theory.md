@@ -1,7 +1,7 @@
 # 量子启发序列推荐 · 论文理论支撑（Theory & Formulation）
 
 > 本文档为论文提供**严格的数学表述与理论论证**，并把"量子信息概念"与"推荐算法设计"一一对应，防止审稿人质疑"只是借用名词"。
-> 状态：持续更新；每个理论条目应逐步被实验（见 `docs/RESEARCH_LOG.md` §6）佐证或修正。
+> 状态：持续更新；每个理论条目应逐步被实验（见 `docs/02_research_log.md` §6）佐证或修正。
 
 ---
 
@@ -114,7 +114,7 @@ $$\rho_{t+1} = \alpha\,\rho_t + (1-\alpha)\,\rho_{i_t}, \qquad \alpha \in [0,1]$
 $$\alpha_t=\sigma\big(W\,[h_t;\,e_{i_t}]+b\big)$$
 
 - 含义：不同用户（甚至不同时刻）的兴趣稳定度不同——长期稳定用户 $\alpha_t\uparrow$，探索型用户 $\alpha_t\downarrow$。
-- 梯度风险：可学习/自适应 $\alpha$ 可能坍缩到 0/1（见 `docs/RESEARCH_LOG.md` §4.5 开放清单）。
+- 梯度风险：可学习/自适应 $\alpha$ 可能坍缩到 0/1（见 `docs/02_research_log.md` §4.5 开放清单）。
 
 ---
 
@@ -136,7 +136,7 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\the
 
 即 trace 打分退化为**平方余弦**（有界 $[0,1]$），而 vector dot 无界。这：
 1. 为"state ⊇ vector"提供严格桥梁（$r=1$ 时 state 恰是平方点积核）；
-2. 解释了 Tr/BCE 不匹配（`docs/RESEARCH_LOG.md` §4.4）：logits 被压到 $[0,1]$。
+2. 解释了 Tr/BCE 不匹配（`docs/02_research_log.md` §4.4）：logits 被压到 $[0,1]$。
 
 ### 4.3 与 dot product 的对比
 
@@ -144,7 +144,7 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\the
 |---|---|---|
 | 对象 | 向量欧氏内积 | 算子内积（含二次/交叉项） |
 | 表达能力 | 一阶 | 二阶（$\rho$ 含 $h h^\top$ 类结构） |
-| 有界性 | 无界 | $[0,1]$（需损失兼容修正，见 `docs/RESEARCH_LOG.md` §4.4） |
+| 有界性 | 无界 | $[0,1]$（需损失兼容修正，见 `docs/02_research_log.md` §4.4） |
 
 > ⚠️ 注意：$\rho$ 含 $L L^\top$ 结构，$\mathrm{Tr}(\rho_u\rho_i)$ 实际等价于对"特征化后的方向"做加权内积——这是受限维度下可能优于纯 dot 的原因；**打分有效性由 A-5 匹配消融验证。**
 
@@ -178,7 +178,7 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\mathrm{Tr}(uu^\top ii^\top)=(u\cdot i)^2=\cos^2\the
 
 > Sequential recommendation models usually encode evolving user preferences as **deterministic latent vectors** $h_t$. We argue that user interest is inherently **uncertain and multi-faceted**, and evolves with each interaction. We propose to represent it as a **dynamic density state** $\rho_t$ (PSD, trace=1), which (i) provides a second-order representation of preference uncertainty, (ii) evolves via a **legality-preserving preference-inertia transition** (convex combination), and (iii) scores next items via **Hilbert–Schmidt similarity** $\mathrm{Tr}(\rho_t\rho_i)$.
 
-贡献三点（与 `docs/PAPER_PROGRESS.md` §3 一致，按重要度）：
+贡献三点（与 `docs/01_paper_progress.md` §3 一致，按重要度）：
 - **C1**：动态密度状态建模——把不确定偏好建模为受约束状态（second-order 结构）。
 - **C2**：合法性保持的偏好惯性演化（含自适应 $\alpha_t$），显式建模兴趣漂移。
 - **C3**：密度状态相似度学习（Hilbert–Schmidt 核）+ 多数据集/多 baseline 系统评估。

@@ -17,7 +17,7 @@ user-invocable: true
 
 ## 打分与损失（当前最重要的已知问题）
 - $\rho_u,\rho_i$ 均为密度矩阵时 $\mathrm{Tr}(\rho_u\rho_i)\in[0,1]$（Hilbert–Schmidt 内积；纯态下退化为 $(u\cdot i)^2$）。
-- ⚠️ **已知 bug 级问题**：`BCEWithLogitsLoss` 期望无界 logits，Tr 打分被压在 $[0,1]$ 会导致正样本损失下界 $\approx0.313$、收敛慢、指标低（`docs/RESEARCH_LOG.md` §4.4）。
+- ⚠️ **已知 bug 级问题**：`BCEWithLogitsLoss` 期望无界 logits，Tr 打分被压在 $[0,1]$ 会导致正样本损失下界 $\approx0.313$、收敛慢、指标低（`docs/02_research_log.md` §4.4）。
 - **候选修正（未定，需实验对比）**：
   1. logit 变换：$\mathrm{logits}'=\log\frac{Tr}{1-Tr}$（clamp，保持 BCE 管线）；
   2. fidelity loss：正样本 $-\log Tr$、负样本 $-\log(1-Tr)$（量子 ML 惯例，语义最贴合）；
@@ -30,6 +30,6 @@ user-invocable: true
 - Uncertainty-aware rec：方差/分布 → 我们密度矩阵统一"不确定性 + 兴趣结构"。
 
 ## 详情
-- 理论完整版：项目根 `docs/THEORY.md`（合法性证明、Born 规则、性质清单、论文叙事）。
-- 实验与 RQ 状态：项目根 `docs/RESEARCH_LOG.md`。
+- 理论完整版：项目根 `docs/03_theory.md`（合法性证明、Born 规则、性质清单、论文叙事）。
+- 实验与 RQ 状态：项目根 `docs/02_research_log.md`。
 - 实现：`model.py`（`StateProjection` / `StateTransition` / `SASRec.variant`）。

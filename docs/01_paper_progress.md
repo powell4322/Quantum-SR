@@ -80,7 +80,7 @@
 - 在 GRU4Rec / BERT4Rec 上复现 E002/E003 → 写成 *generalization across encoders*。
 
 ### 4.4 铁律
-- 除被验证维度外**同超参**；Tr/BCE 兼容修正（§4.4 RESEARCH_LOG）落地后再跑正式实验；结果回填 `docs/RESEARCH_LOG.md` §6 与本文档 §4。
+- 除被验证维度外**同超参**；Tr/BCE 兼容修正（§4.4 RESEARCH_LOG）落地后再跑正式实验；结果回填 `docs/02_research_log.md` §6 与本文档 §4。
 
 ---
 
@@ -109,12 +109,12 @@
 
 | 文档 | 职责 | 结论 |
 |---|---|---|
-| `docs/RESEARCH_LOG.md` | 研究追踪（RQ 状态、实验日志、问题） | ✅ **保留**（核心） |
-| `docs/THEORY.md` | 论文理论支撑（正式、权威源） | ✅ **保留**，但需与 RESEARCH_LOG 新口径对齐（rank>1 谱分解、dof 分析、偏好惯性） |
-| `docs/PAPER_PROGRESS.md` | 论文推进+审核驱动（本文档） | ✅ **保留**（新增） |
-| `docs/sasrec.md` | 代码使用说明 | ✅ **保留**（英文名，已决定；中文名文档已删除） |
-| `docs/RELATED_WORK.md` | 相关工作总结 + 防撞对照表（quantum rec / uncertainty rec / distributional rec） | ✅ **新增**（采纳 GPT：防止撞 idea） |
-| `docs/EXPERIMENT_PLAN.md` | 实验矩阵（数据集、baseline、主/消融/分析） | ✅ **新增**（采纳 GPT：所有实验矩阵集中管理） |
+| `docs/02_research_log.md` | 研究追踪（RQ 状态、实验日志、问题） | ✅ **保留**（核心） |
+| `docs/03_theory.md` | 论文理论支撑（正式、权威源） | ✅ **保留**，但需与 RESEARCH_LOG 新口径对齐（rank>1 谱分解、dof 分析、偏好惯性） |
+| `docs/01_paper_progress.md` | 论文推进+审核驱动（本文档） | ✅ **保留**（新增） |
+| `docs/06_usage_sasrec.md` | 代码使用说明 | ✅ **保留**（英文名，已决定；中文名文档已删除） |
+| `docs/04_related_work.md` | 相关工作总结 + 防撞对照表（quantum rec / uncertainty rec / distributional rec） | ✅ **新增**（采纳 GPT：防止撞 idea） |
+| `docs/05_experiment_plan.md` | 实验矩阵（数据集、baseline、主/消融/分析） | ✅ **新增**（采纳 GPT：所有实验矩阵集中管理） |
 | `.github/skills/*` | 研究 skill | ✅ 保留（需同步 quantum-seq-rec 的"rank>1 多兴趣"措辞） |
 
 **职责划分原则**：RESEARCH_LOG = 研究过程（是什么/发生了什么）；THEORY = 理论为什么成立；PAPER_PROGRESS = 论文怎么组织+审核入口；使用说明 = 给代码使用者。避免同一内容出现在两处。
@@ -123,7 +123,7 @@
 
 ## 7. 当前状态 & 下一步（截至 2026-08-02，采纳 GPT 审稿意见后）
 - [x] 定位转向 Dynamic Density-State Modeling（§1.1）；贡献重排（§3）；增 Constraint Gap（§2）
-- [x] 新增 `docs/RELATED_WORK.md`（防撞）、`docs/EXPERIMENT_PLAN.md`（实验矩阵）
+- [x] 新增 `docs/04_related_work.md`（防撞）、`docs/05_experiment_plan.md`（实验矩阵）
 - [x] THEORY 弱化 CPTP/Born；RQ 对齐（RQ1 表示 / RQ2 演化 / RQ3 优势时机）
 - [ ] **Step 1**：RELATED_WORK 防撞检查（确认 dynamic density state 是否有人做过）→ 填对照表
 - [ ] **Step 2**：冻结 Motivation + Contribution + Method overview → 形成论文第一页

@@ -5,11 +5,11 @@
 
 ---
 
-## 0. 结论（2026-08-03 首轮 arXiv 检索后更新）
-- [x] 是否已有工作做 **dynamic density-state evolution for sequential recommendation**？→ **未发现直接先例**（arXiv 检索范围内）：density matrix 用于推荐的工作（ConQAR、WWW 2026、quantum-inspired algorithms）都是**静态 / 非序列 / 算法加速**；Gaussian/distributional embedding 系列虽已用于序列，但**不是 density operator、演化无硬约束**。
-- [x] 是否已有工作做 **legality-preserving preference transition**？→ **未发现**：interest drift 建模（HCRNN、PERIS 等）均为向量/RNN 门控，无 PSD+trace 硬约束。
-- ✅ **动态密度状态演化 = 空白点（可作核心卖点）**；但论文需明确与 **ConQAR**（density matrix 表示，非序列非动态）和 **Gaussian embedding 系列**（不确定性表示，非算子态）划清界限。
-- ⚠️ 本结论基于 arXiv 首轮检索；投稿前需再用 Semantic Scholar / DBLP / Google Scholar 复核（见 §4）。
+## 0. 结论（2026-08-03 更新：发现关键邻近先例，需精读）
+- 🔴 **重要发现**：DBLP 命中 **"Density Matrix Based Preference Evolution Networks for E-Commerce Recommendation"（DASFAA 2019, DOI 10.1007/978-3-030-18579-4_22）**——标题同时含 **density matrix + preference evolution**，疑似直接先例。**"空白点"结论降级为"待精读确认差异"，不能默认首创。**
+- [ ] **待办（写论文前必做）**：获取该文全文（学校 Springer 权限），确认：① 是否序列 / next-item 任务？② 演化机制是否 PSD+trace 保合法凸组合？③ 打分方式？④ 与我们的差异——若无差异，定位从"首次"改为"显著扩展 + 理论强化（合法性 + 序列级 + 新打分）"。
+- [x] 其余方向未发现直接先例（arXiv + DBLP 首轮）：density matrix 用于推荐（ConQAR 静态评分、WWW 2026 静态 CF）；Gaussian/distributional（非算子态、无硬约束）；interest drift（向量/RNN 门控）。
+- ⚠️ 论文写作前必须先精读 DASFAA 2019 并明确差异；否则有撞 idea 风险。
 
 ---
 
@@ -17,6 +17,7 @@
 
 | 代表工作 | 核心做法 | 静态 or 动态状态 | 是否覆盖"序列演化" | 与我们差异 |
 |---|---|---|---|---|
+| 🔴 **DASFAA 2019: Density Matrix Based Preference Evolution Networks**（DOI 10.1007/978-3-030-18579-4_22） | density matrix 表示 + 偏好演化（e-commerce） | **⚠️ 待精读确认是否动态** | **⚠️ 疑似是** | **最需核查**；若为动态 density 演化，定位从"首次"改为"扩展 + 理论强化" |
 | **ConQAR**（arXiv 1912.11720, ICTIR'19 WS） | quantum-like **density matrix layer** 捕获卷积特征交互，用于**评论评分预测（rating）** | 静态（用户/物品各一表示） | ❌ 非序列、非动态 | 我们做**序列 next-item + 动态演化**；它是基于文本评论的评分 |
 | WWW 2026 *Quantum-enhanced Repr. & Matching for Rec* | 用户表示为一阶密度算子 + 量子匹配（static CF） | **静态** $\rho_u$ | ❌ 无序列/时间维 | 我们引入 $\rho_1\to\rho_T$ 动态演化 + 保合法性转移 |
 | Quantum-inspired algorithms（Kerenidis-Prakash / E. Tang 等） | 低秩矩阵近似、采样加速（复杂度） | 非表示学习 | ❌ | 属算法加速，非表示/序列建模 |
@@ -80,4 +81,12 @@
 | all:"Gaussian embedding" AND all:recommendation | 5 | CGE、W-GAT、G-STO、NEAT |
 | all:"interest drift" AND all:recommendation | 10 | HCRNN、PERIS、TAI2Vec、UniRec、PaperFlow |
 
-> **待补充**（投稿前复核）：① Semantic Scholar（首轮 429 限流）；② DBLP / Google Scholar；③ WWW 2026 那篇原文与引用链；④ "density operator" / "quantum state" + sequential 的更多组合。
+### 第二轮（2026-08-03，DBLP + Semantic Scholar）
+
+| 检索式 | 命中 | 相关代表 |
+|---|---|---|
+| DBLP: "quantum recommendation" | 多 | WWW 2026（已知）、tSVD-based quantum context-aware rec（Quantum Inf. Process. 2021）、hybrid classical-quantum rec（Quantum Mach. Intell. 2025）、holographic perception rec（Inf. Fusion 2026） |
+| DBLP: "density matrix recommendation" | 少 | 🔴 **DASFAA 2019: Density Matrix Based Preference Evolution Networks**（待精读） |
+| Semantic Scholar（首轮） | - | 429 限流，待重试 |
+
+> **待补充**（投稿前复核）：① Semantic Scholar 重试；② Google Scholar；③ WWW 2026 原文引用链；④ **DASFAA 2019 全文精读（最高优先）**。
