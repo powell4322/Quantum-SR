@@ -9,13 +9,13 @@
 
 ### 1.1 一句话起点（研究声明）
 > 主流序列推荐用**点估计向量**编码用户兴趣；我们提出**动态密度状态（dynamic density-state）建模**：把用户兴趣表示为满足 $\rho\succeq0,\ \mathrm{Tr}(\rho)=1$ 约束的**偏好状态** $\rho_t$，随每次交互按**偏好惯性**演化，并用 Hilbert–Schmidt 相似度完成 next-item 预测。
-> ⚠️ 定位（采纳 GPT 审稿建议 2026-08-02）：**不是 "Quantum Recommendation"**。卖点是 *dynamic uncertainty-aware preference state modeling*；density operator 只是实现"状态合法约束 + 可解释演化"的数学工具（quantum-inspired 仅作来源说明，全文控制 "quantum" 出现次数）。
+> ⚠️ 定位（2026-08-03 依据 DMPEN 精读修正）：**不再声称"首次把 density matrix 用于序列推荐"**（DMPEN, DASFAA 2019 已做 density matrix + RNN 演化）。我们的定位改为：**把 density operator 从"特征表示"升级为"动态、合法、可解释的偏好状态"**。*Existing density-matrix recommendation methods mainly exploit second-order preference representations, while we study density operators as dynamically evolving preference states under sequential interaction.*
 
-### 1.2 标题方向（候选，避免 "Quantum" 打头）
-- **Dynamic Density States for Uncertainty-Aware Sequential Recommendation**（推荐主标题）
-- *Modeling Evolving User Preferences with Dynamic Density Operators in Sequential Recommendation*
-- *A Quantum-Inspired Approach for Uncertainty-aware Preference Evolution*（作副标题/来源说明）
-> "Quantum-inspired" 放摘要/方法来源说明，不出现在主标题。
+### 1.2 标题方向（2026-08-03 依 DMPEN 精读调整，避免与 DMPEN 撞车）
+- **Option A（推荐）**：*Dynamic Density State Modeling for Uncertainty-Aware Sequential Recommendation*（无 quantum，WWW 风格）
+- **Option B**：*From Point Preferences to Density States: Modeling Uncertainty and Evolution in Sequential Recommendation*（强调 transition）
+- **Option C**：*Legality-Preserving Preference Evolution via Density Operators for Sequential Recommendation*（突出数学）
+> "Quantum-inspired" 仅作来源说明，不出现在主标题。
 
 ### 1.3 目标会议（已定：WWW，或近期截稿的合适会议）
 | 项 | 内容 |
@@ -33,27 +33,38 @@
 
 ## 2. Motivation（动机，可直接进 Intro）
 
-三个核心 Gap（采纳 GPT 审稿建议 2026-08-02 增补 Constraint Gap）：
+三个核心 Gap（2026-08-03 依 DMPEN 精读重定义——注意：**"density matrix + sequential" 已有人做（DMPEN 2019）**，Gap 不再是"没人做 density 序列"）：
 
-1. **Representation Gap（G1）**：主流序列推荐（SASRec/BERT4Rec）用点估计表示兴趣，丢失**不确定性**与**多模态偏好结构**。
-2. **Sequential Gap（G2，核心空白）**：现有 quantum-inspired 推荐（WWW 2026 等）只做**静态 CF**（静态 $\rho_u$），**从未**把 density-operator 用于建模序列兴趣的**演化与漂移**。
-3. **Constraint Gap（G3）**：现有概率/分布表示（Gaussian、distributional）的演化缺乏**结构化状态约束**——任意 $h_{t+1}=f(h_t,x_t)$ 无约束；我们的状态演化**恒保** PSD+trace（合法状态）。
+1. **Representation Gap（G1）**：主流序列推荐（SASRec/BERT4Rec）用点估计向量表示兴趣，丢失**不确定性**与**多模态偏好结构**。
+2. **Evolution Gap（G2，真正创新）**：现有 density-matrix 方法（**DMPEN, DASFAA 2019**）把 density matrix 作为**二阶特征**送入 RNN（$\rho=ee^\top$，$h_t=\sigma(Wh_{t-1}+V\rho_t+b)$）——density 是**输入特征**而非**偏好状态**；主流序列模型（SASRec/BERT4Rec/GRU4Rec）的 hidden state 也无显式约束/概率解释。**没有人研究"density operator 如何作为动态偏好状态被合法演化"。**
+3. **Constraint Gap（G3）**：现有演化（RNN/attention）无**结构化状态约束**——任意 $h_{t+1}=f(h_t,x_t)$ 无约束；我们的状态演化**恒保** PSD+trace（每步都是合法 preference distribution）。
 
-**定位提醒（审稿风险规避）**：贡献主体是 *dynamic uncertainty-aware preference state modeling*；量子只是数学工具（density operator / convex mixing / HS kernel），用于提供合法（PSD+trace 保持）且可解释的框架。
+**与 DMPEN 的关键区别（必须写进论文）**：DMPEN 问 "How to encode a behavior into a density matrix?"；我们问 "How does a density state evolve over time (with legality)?"——前者把 density 当表示增强，后者把 density 当**受约束的状态机**。
+
+**定位对比表（DMPEN vs Ours vs 经典序列模型）**
+| 维度 | DMPEN (2019) | 我们 (Ours) | SASRec/BERT4Rec |
+|---|---|---|---|
+| density matrix 用途 | **二阶特征**（输入 RNN） | **动态偏好状态**（演化对象） | 无 |
+| 演化机制 | RNN hidden state | 凸组合（保 PSD+trace） | attention / 无显式演化 |
+| 状态约束 | 无（hidden state 无约束） | ✅ 恒保合法性 | 无 |
+| uncertainty | 弱（借二阶相关性） | 强（谱=不确定性分解） | 弱（点估计） |
+| 打分 | softmax | Hilbert–Schmidt 核 | dot / softmax |
+
+**定位提醒**：贡献主体是 *dynamic uncertainty-aware preference state modeling*；density operator 只是实现"状态合法约束 + 可解释演化"的数学工具（quantum-inspired 仅作来源说明）。
 
 ---
 
 ## 3. Contribution（贡献声明，每条绑定证据）
 
-> 贡献按重要度排序（采纳 GPT 审稿建议 2026-08-02：**dynamic state modeling 与 evolution 并列第一**，similarity 降级）。
+> 贡献按重要度排序（2026-08-03 依 DMPEN 精读修订：**C2 合法性演化 = 核心**，C1 不再声称"首次"）。
 
 | # | 贡献（英文表述，供论文） | 对应模块 / 证据 | 回答 |
 |---|---|---|---|
-| **C1（★★★）** | **Dynamic density-state modeling**：把不确定、多面化的用户偏好建模为受约束的密度状态（beyond deterministic embeddings）。*We introduce a dynamic density-state formulation for sequential recommendation, enabling explicit modeling of evolving uncertain preferences.* | `StateProjection` + `StateTransition`；THEORY §2/§3；E002/E003 | RQ1/RQ2 |
-| **C2（★★★）** | **Legality-preserving preference evolution**：设计保 PSD+trace 的偏好转移机制（偏好惯性 + 自适应 $\alpha_t$），显式建模兴趣漂移。*We design a legality-preserving preference transition mechanism that explicitly models interest drift.* | `StateTransition`（含 adaptive α）；THEORY §3；E003 + E004 | **RQ2（核心）** |
-| **C3（★）** | **Density-based matching + 全面评估**：用 Hilbert–Schmidt 核做状态相似度；在多数据集/多 baseline 上做系统评估与消融。*We develop density-state similarity learning with Hilbert–Schmidt kernel.* | `match`；A-1~A-5 + 多数据集；EXPERIMENT_PLAN | RQ3 |
+| **C1（★★）** | **Density states as sequential preference representations**：用受约束密度状态扩展点向量表示，带不确定性感知的二阶结构。*We introduce density states as explicit sequential preference representations, extending point-based user representations with uncertainty-aware second-order structures.*（≠ DMPEN：我们把 density 当状态而非特征） | `StateProjection`；03_theory §2；E002（含 DMPEN 对照） | RQ1 |
+| **C2（★★★ 核心）** | **Legality-preserving preference transition**：保 PSD+trace 的凸组合状态演化（偏好惯性 + 自适应 $\alpha_t$），显式建模兴趣漂移。*We propose a legality-preserving preference transition mechanism based on convex state evolution, maintaining PSD and trace constraints during sequential updates.* | `StateTransition`（含 adaptive α）；03_theory §3；E003 + E004 | **RQ2（核心）** |
+| **C3（★）** | **Density-state similarity (Hilbert–Schmidt)**：用 HS 核做状态相似度 + 多数据集/多 baseline 系统评估。*We develop density-state similarity learning with Hilbert–Schmidt kernel.*（不说 quantum measurement） | `match`；A-1~A-5 + 多数据集；05_experiment_plan | RQ3 |
 
-> 写作注意：不再使用"首次/novel"类主观词；C3 的 HS similarity 不单独作为卖点，作为完整评估的一部分。
+> 写作注意：**不得再写"首次引入 density matrix 到推荐/序列"**（会被 DMPEN 击穿）；必须显式写 *Different from DMPEN that uses density matrices as second-order feature representations for RNNs, we investigate density operators as dynamic preference states with explicit legality-preserving evolution.*
 
 ---
 
@@ -63,7 +74,7 @@
 | 阶段 | 实验 | 对比 | 目的 | 回答 |
 |---|---|---|---|---|
 | 1 | E001 | SASRec vector baseline（正式超参） | 确认 HR/NDCG 复现 | RQ1 对照 |
-| 2 | E002 | **Representation Ablation**：vector vs state-r1 vs state-r4 vs Gaussian（同参数量） | density 表示是否有必要 | RQ1 |
+| 2 | E002 | **Representation Ablation**：vector vs state-r1 vs state-r4 vs Gaussian vs **DMPEN-style（density-as-feature + RNN）**（同参数量） | density 表示是否有必要 + 证明与 DMPEN 不同 | RQ1 |
 | 3 | E003 | **Evolution Ablation**：static 最后状态 vs EMA(fixed α) vs dynamic(learnable α) | 动态演化是否优于静态（**论文核心图**） | RQ2（核心） |
 | 4 | E004 | **Interest shift 模拟**：前 50 Action → 后 50 Romance，测适应步数 | 直接验证偏好漂移（比 long-tail 更能证明创新） | RQ2/H2 |
 
@@ -101,7 +112,8 @@
 | 日期 | 阶段 | GPT 意见（要点） | 我们处理 / 采纳 | 结果 / 对论文影响 |
 |---|---|---|---|---|
 | 2026-08-02 | 方向收敛 | （示例）"量子只是工具，贡献主体是 uncertainty-aware 建模" | 采纳：措辞全部改为 density-state | 动机更稳（见 §2） |
-| 2026-08-02 | 整稿审阅（GPT） | ① 定位从"quantum 推荐"转向"dynamic density-state"；② 贡献重排（evolution 第一）；③ 增 Constraint Gap；④ CPTP/Born 弱化；⑤ 多数据集多 baseline；⑥ interest-shift 作为核心分析；⑦ 修 Tr loss + 加 adaptive α | 全部采纳：§1/§2/§3/§4 已改；新增 RELATED_WORK/EXPERIMENT_PLAN；THEORY 弱化 CPTP/Born；RQ 对齐 RQ1 表示/RQ2 演化/RQ3 优势时机 | 定位更稳，防"只是换 distribution 表示"攻击 |
+| 2026-08-02 | 整稿审阅（GPT） | ① 定位从"quantum 推荐"转向"dynamic density-state"；② 贡献重排（evolution 第一）；③ 增 Constraint Gap；④ CPTP/Born 弱化；⑤ 多数据集多 baseline；⑥ interest-shift 作为核心分析；⑦ 修 Tr loss + 加 adaptive α | 全部采纳：§1/§2/§3/§4 已改；新增 04_related_work/05_experiment_plan；03_theory 弱化 CPTP/Born；RQ 对齐 | 定位更稳，防"只是换 distribution 表示"攻击 |
+| 2026-08-03 | DMPEN 精读（GPT） | 发现 DMPEN(DASFAA 2019) 已做 density matrix + RNN 序列演化 → **"首次 density+sequential" 不成立**；创新点迁移到 "dynamic density state evolution + legality"；必须加 DMPEN baseline；标题避免撞车 | 全部采纳：§1/§2/§3/§4 已改；04_related_work 记入 DMPEN 详情；定位改为"density 状态机 vs 特征" | 避免被 2019 论文直接击穿 |
 
 ---
 

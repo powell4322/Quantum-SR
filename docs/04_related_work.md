@@ -6,10 +6,9 @@
 ---
 
 ## 0. 结论（2026-08-03 更新：发现关键邻近先例，需精读）
-- 🔴 **重要发现**：DBLP 命中 **"Density Matrix Based Preference Evolution Networks for E-Commerce Recommendation"（DASFAA 2019, DOI 10.1007/978-3-030-18579-4_22）**——标题同时含 **density matrix + preference evolution**，疑似直接先例。**"空白点"结论降级为"待精读确认差异"，不能默认首创。**
-- [ ] **待办（写论文前必做）**：获取该文全文（学校 Springer 权限），确认：① 是否序列 / next-item 任务？② 演化机制是否 PSD+trace 保合法凸组合？③ 打分方式？④ 与我们的差异——若无差异，定位从"首次"改为"显著扩展 + 理论强化（合法性 + 序列级 + 新打分）"。
-- [x] 其余方向未发现直接先例（arXiv + DBLP 首轮）：density matrix 用于推荐（ConQAR 静态评分、WWW 2026 静态 CF）；Gaussian/distributional（非算子态、无硬约束）；interest drift（向量/RNN 门控）。
-- ⚠️ 论文写作前必须先精读 DASFAA 2019 并明确差异；否则有撞 idea 风险。
+- 🔴 **DMPEN（DASFAA 2019）已精读（2026-08-03）**：density matrix + RNN 序列演化**确实已存在**——**"首次 density+sequential" 不成立**。DMPEN 把 density matrix 当作**二阶特征**（$\rho=ee^\top$）输入 RNN；密度**不是偏好状态**，演化靠 RNN hidden state，无 PSD+trace 硬约束。
+- ✅ **我们的差异化（已确认可立足）**：研究 **density operator 作为动态偏好状态**，提出 **legality-preserving 凸组合演化**（每步保 PSD+trace）——这是 DMPEN 没有的（问题从"如何把行为编码成 density matrix"变为"density state 如何被合法演化"）。
+- ⚠️ 论文必须：① 显式引用 DMPEN 并说明差异；② 加 DMPEN-style baseline；③ 标题避免与 DMPEN 撞车。
 
 ---
 
@@ -17,7 +16,7 @@
 
 | 代表工作 | 核心做法 | 静态 or 动态状态 | 是否覆盖"序列演化" | 与我们差异 |
 |---|---|---|---|---|
-| 🔴 **DASFAA 2019: Density Matrix Based Preference Evolution Networks**（DOI 10.1007/978-3-030-18579-4_22） | density matrix 表示 + 偏好演化（e-commerce） | **⚠️ 待精读确认是否动态** | **⚠️ 疑似是** | **最需核查**；若为动态 density 演化，定位从"首次"改为"扩展 + 理论强化" |
+| 🔴 **DMPEN**（DASFAA 2019, DOI 10.1007/978-3-030-18579-4_22）| density matrix 作为**二阶特征**（$\rho=ee^\top$）送入 RNN 建模偏好演化（e-commerce） | **有 RNN 时序演化** | ✅ 是（但 density=特征，非状态） | **已精读（2026-08-03）**：density 是输入特征而非偏好状态；演化靠 RNN hidden state，无 PSD+trace 硬约束。我们研究 density operator 作为**动态合法状态** |
 | **ConQAR**（arXiv 1912.11720, ICTIR'19 WS） | quantum-like **density matrix layer** 捕获卷积特征交互，用于**评论评分预测（rating）** | 静态（用户/物品各一表示） | ❌ 非序列、非动态 | 我们做**序列 next-item + 动态演化**；它是基于文本评论的评分 |
 | WWW 2026 *Quantum-enhanced Repr. & Matching for Rec* | 用户表示为一阶密度算子 + 量子匹配（static CF） | **静态** $\rho_u$ | ❌ 无序列/时间维 | 我们引入 $\rho_1\to\rho_T$ 动态演化 + 保合法性转移 |
 | Quantum-inspired algorithms（Kerenidis-Prakash / E. Tang 等） | 低秩矩阵近似、采样加速（复杂度） | 非表示学习 | ❌ | 属算法加速，非表示/序列建模 |
