@@ -16,9 +16,9 @@
 
 | 代表工作 | 核心做法 | 静态 or 动态状态 | 是否覆盖"序列演化" | 与我们差异 |
 |---|---|---|---|---|
-| 🔴 **DMPEN**（DASFAA 2019, DOI 10.1007/978-3-030-18579-4_22）| density matrix 作为**二阶特征**（$\rho=ee^\top$）送入 RNN 建模偏好演化（e-commerce） | **有 RNN 时序演化** | ✅ 是（但 density=特征，非状态） | **已精读（2026-08-03）**：density 是输入特征而非偏好状态；演化靠 RNN hidden state，无 PSD+trace 硬约束。我们研究 density operator 作为**动态合法状态** |
+| 🔴 **DMPEN**（DASFAA 2019, DOI 10.1007/978-3-030-18579-4_22）| density matrix 作为**二阶特征**（$\rho=ee^\top$，不降维）送入 basic-RNN/GRU/LSTM 建模偏好演化（Amazon+Taobao） | **有 RNN 时序演化** | ✅ 是（但 density=特征，非状态） | **已精读原文核验（2026-08-03）**：① density=输入特征（"convert vectors into density matrices before feeding them to RNNs"）；② 演化靠 RNN hidden state，无 PSD+trace 硬约束；③ 评价 AUC/accuracy（非 next-item ranking）；④ 论文自承 "fail to theoretically explain" density-matrix 表示 → 我们提供合法性理论 + next-item 评价 + 状态机演化 |
 | **ConQAR**（arXiv 1912.11720, ICTIR'19 WS） | quantum-like **density matrix layer** 捕获卷积特征交互，用于**评论评分预测（rating）** | 静态（用户/物品各一表示） | ❌ 非序列、非动态 | 我们做**序列 next-item + 动态演化**；它是基于文本评论的评分 |
-| WWW 2026 *Quantum-enhanced Repr. & Matching for Rec* | 用户表示为一阶密度算子 + 量子匹配（static CF） | **静态** $\rho_u$ | ❌ 无序列/时间维 | 我们引入 $\rho_1\to\rho_T$ 动态演化 + 保合法性转移 |
+| WWW 2026 *Quantum-enhanced Repr. & Matching for Rec* | quantum-enhanced **representation + matching** for CF；三个 paradigm；graph/social 场景；6 数据集 | **静态 CF** | ❌ 无序列/时间维 | **已核验原文（2026-08-03）**：是 CF（用户-物品交互），非序列；我们做序列动态状态演化 |
 | Quantum-inspired algorithms（Kerenidis-Prakash / E. Tang 等） | 低秩矩阵近似、采样加速（复杂度） | 非表示学习 | ❌ | 属算法加速，非表示/序列建模 |
 | VBAE（arXiv 2105.07597） | 高斯潜变量 + **quantum-inspired uncertainty 度量**（hybrid CF） | 静态 | ❌ | 不确定性度量启发，非 density-state 序列演化 |
 | Quantum-theory-inspired rec（arXiv 1601.06035） | 量子模型 / PSD 因子化做 item 推荐 | 静态 | ❌ | 理论动机启发，非序列状态演化 |
