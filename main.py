@@ -32,7 +32,7 @@ parser.add_argument('--state_rank', default=1, type=int)
 parser.add_argument('--transition', default='fixed', type=str, choices=['fixed', 'learnable'])
 parser.add_argument('--transition_alpha', default=0.9, type=float)
 parser.add_argument('--eval_every', default=20, type=int)
-parser.add_argument('--loss', default='bce', type=str, choices=['bce', 'bpr'])
+parser.add_argument('--loss', default='bpr', type=str, choices=['bce', 'bpr'])
 
 args = parser.parse_args()
 if not os.path.isdir(args.dataset + '_' + args.train_dir):

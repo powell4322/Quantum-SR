@@ -9,33 +9,41 @@
 | 数据集 | 规模 | 定位 | 验证点 |
 |---|---|---|---|
 | `ml-1m` | 999,611 交互 / 6,040 用户 / 3,416 物品 | 快速验证 | 主实验、消融 |
-| `Beauty` | ~198k / ~22k / ~12k | **稀疏** | RQ3：density 在稀疏下优势 |
-| `Steam` | 大 | **长尾/游戏** | RQ3：长尾 |
-| `Yelp`（候选） | 大 | **兴趣变化** | E004 兴趣漂移 |
+| `Beauty` | ~198k / ~22k / ~12k | **稀疏** | RQ1/RQ4：density 在稀疏/不确定性下优势 |
+| `Steam` | 大 | **长尾/游戏** | RQ4：长尾 |
+| `Yelp`（候选） | 大 | **兴趣变化** | RQ2：动态演化 |
 - ⚠️ 数据文件不入库（gitignore），服务器/本地单独放置 `data/`。
 
-## 2. Baseline（2026-08-03 定稿：主表 6 个，不多加）
+## 2. Baseline（2026-08-03 二次定稿：四阶递进 + 主表 6 个）
 
-**主表 baseline**
+**四阶递进逻辑（核心叙事：Vector < Density Feature < Density State < Dynamic）**
+| 阶梯 | Baseline / 变体 | 回答 | RQ |
+|---|---|---|---|
+| A | Vector（SASRec） | 基准 | - |
+| B | **Density Feature**（模拟 DMPEN：$ee^\top$→flatten→SASRec） | density representation 是否有效 | RQ1 |
+| C | Density State static（$\rho_T$） | state 是否有效 | RQ1 |
+| D | Density Dynamic（凸组合演化，最终模型） | 动态演化是否有效 | **RQ2** |
+
+**主表 baseline（6 个）**
 | baseline | 说明 | 状态 |
 |---|---|---|
-| GRU4Rec | RNN 基线（与 DMPEN 同族，便于解释 DMPEN 提升来源） | ⬜ 待接入 |
+| GRU4Rec | RNN 基线（与 DMPEN 同族） | ⬜ 待接入 |
 | SASRec | Transformer 点估计基线（= vector variant） | ✅ 已有 |
 | BERT4Rec | 双向 Transformer 基线 | ⬜ 待接入 |
-| **DMPEN** | density-as-feature + RNN（**关键对照，证明 feature≠state**） | ⬜ E000 复现 |
+| **DMPEN** | density-as-feature + RNN（关键对照） | ⬜ E000 复现 |
 | Ours-static | 密度状态、无演化 | ✅ 已有（state variant） |
 | Ours-dynamic | 密度状态 + 合法性演化 | ✅ 已有（dynamic variant） |
 
-> 暂缓（先证明 idea，WWW 不是 baseline 越多越好）：Caser / Gaussian embedding / MIND / ComiRec。
+> 暂缓：Caser / Gaussian embedding / MIND / ComiRec。
 
-## 3. 主实验矩阵（与 PAPER_PROGRESS §4.1 对应）
+## 3. 主实验矩阵（与 01_paper_progress §4.1 对应；loss 主 = BPR）
 
-| 阶段 | 实验 | 对比（同参数量） | 指标 | 目的 |
-|---|---|---|---|---|
-| 1 | E001 | SASRec vector | NDCG@10 / HR@10 | 基线复现 |
-| 2 | E002 | vector vs state-r1 vs state-r4 vs Gaussian | NDCG@10 / HR@10 | **Representation Ablation**（RQ1） |
-| 3 | E003 | static(末状态) vs EMA(fixed α) vs dynamic(learnable α) | NDCG@10 / HR@10 | **Evolution Ablation**（RQ2 核心图） |
-| 4 | E004 | 前 50 Action → 后 50 Romance | **adaptation steps** | Interest shift（RQ2/H2 最有力证据） |
+| RQ | 实验 | 对比（同参数量） | 指标 |
+|---|---|---|---|
+| RQ1 | E001 | Vector(A) vs Density Feature(B) vs Density State static(C) | NDCG@10 / HR@10 |
+| RQ2 | E002 | static(C) vs dynamic(D)；E003 α 扫描 0.1–0.9 | NDCG@10 / HR@10 |
+| RQ3 | E004 | remove PSD / remove trace / unconstrained matrix | NDCG@10 / HR@10 |
+| RQ4 | E005 | entropy $H(\rho)$ 分析 + interest-shift（前 50 A → 后 50 B） | entropy / adaptation steps |
 
 ## 4. 分析实验（附）
 
@@ -45,11 +53,12 @@
 | A-2 序列长度 | history 5/10/20/50 | 增益曲线 |
 | A-3 匹配消融 | dot vs trace（纯态下 $Tr=(u\cdot i)^2$） | NDCG/HR |
 | A-4 长尾 | 按 popularity 分 head/mid/tail | 分组 NDCG/HR |
-| A-5 多样性 | coverage / ILD | RQ3 补充 |
+| A-5 多样性 | coverage / ILD | RQ4 补充 |
+| A-6 损失消融 | BPR(主) vs BCE(logit) vs fidelity | NDCG/HR |
 
 ## 5. 铁律（违反则结论作废）
 - 除被验证维度外**同超参**（lr/batch/maxlen/hidden/blocks/heads/dropout/epochs）；
-- **Tr/BCE 兼容修正落地后**（temperature 或 logit 变换）再跑正式实验；
+- **loss 主 = BPR**（默认）；BCE(logit) 作消融（Tr/BCE 修正已于 2026-08-03 落地）；
 - 结果一律回填 `docs/02_research_log.md` §6 + `docs/01_paper_progress.md` §4，并更新本表"状态"。
 
 ## 6. GPU 服务器运行
@@ -57,6 +66,6 @@
 cd SASRec.pytorch-main
 pip install numpy
 pip install torch --index-url https://download.pytorch.org/whl/cu121  # 按 nvidia-smi 的 CUDA 版本
-python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --tag main
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr --tag main
 # 结果 → results/exp_main.csv → 回填 RESEARCH_LOG §6
 ```

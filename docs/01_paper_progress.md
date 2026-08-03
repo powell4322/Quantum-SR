@@ -11,11 +11,10 @@
 > Sequential recommendation models user interests as hidden vectors $h_t=f(S_{\le t})$. However, user preference evolution has two characteristics: **uncertainty** and **gradual transition**. Existing methods (SASRec/BERT4Rec: point/contextual vectors; MIND: multiple but independent vectors; DMPEN: density as **feature** with RNN evolution) lack **a mathematically constrained evolving preference state**. We formulate user preference as a **dynamic density state** $\rho_t$ (PSD, trace=1) that evolves via a **legality-preserving convex transition**, and score next items by **Hilbert–Schmidt similarity**.
 > ⚠️ 定位（2026-08-03 定稿）：创新主体 = **dynamic legality-preserving density state evolution**；**不做"首次 density"claim**（DMPEN 已做 density+sequential）；quantum 仅作来源说明，正文用 **operator-level** 表述。
 
-### 1.2 标题方向（2026-08-03 依 DMPEN 精读调整，避免与 DMPEN 撞车）
-- **Option A（推荐）**：*Dynamic Density State Modeling for Uncertainty-Aware Sequential Recommendation*（无 quantum，WWW 风格）
-- **Option B**：*From Point Preferences to Density States: Modeling Uncertainty and Evolution in Sequential Recommendation*（强调 transition）
-- **Option C**：*Legality-Preserving Preference Evolution via Density Operators for Sequential Recommendation*（突出数学）
-> "Quantum-inspired" 仅作来源说明，不出现在主标题。
+### 1.2 标题方向（2026-08-03 二次定稿：标题不含 quantum）
+- **Option 1（推荐）**：*Learning Dynamic Preference States via Legality-Preserving Density Evolution for Sequential Recommendation*
+- **Option 2**：*Uncertainty-Aware Sequential Recommendation with Density State Evolution*（更安全）
+> 标题**绝不出现 quantum**（WWW reviewer 对 quantum recommendation 已有 quantum CF / quantum embedding 先例，易被归为"又一个 quantum-inspired gimmick"）。
 
 ### 1.3 目标会议（已定：WWW，或近期截稿的合适会议）
 | 项 | 内容 |
@@ -65,31 +64,46 @@
 
 ## 3. Contribution（贡献声明，每条绑定证据）
 
-> 贡献按重要度排序（2026-08-03 定稿：**C2 是唯一核心**，C1 不作核心、不 claim 首次）。
+> 贡献按重要度排序（2026-08-03 二次定稿：C2 唯一核心；C1 强调 state transition；C3 改为 uncertainty modeling）。
 
 | # | 贡献（英文定稿） | 对应模块 / 证据 | 回答 |
 |---|---|---|---|
-| **C1（★★）** | **Dynamic density-state representation**：把用户偏好表示为动态密度状态而非确定性潜在向量，提供不确定性感知的二阶表示。*We formulate user preference as a dynamic density state rather than a deterministic latent vector, providing an uncertainty-aware second-order representation for sequential recommendation.*（关键词：dynamic state / uncertainty-aware / second-order） | `StateProjection`；03_theory §2；E001 | RQ1 |
-| **C2（★★★ 唯一核心）** | **Legality-preserving preference transition**：基于凸密度状态演化的保合法转移机制。*We propose a legality-preserving preference transition mechanism based on convex density-state evolution.*（density→density→density 状态机，≠ DMPEN 的 density→RNN→hidden） | `StateTransition`（fixed α 为主，adaptive 为 extension）；03_theory §3；E002/E003/E004 | **RQ2** |
-| **C3（★）** | **Operator-level similarity kernel**：用 Hilbert–Schmidt 相似度打分 + 系统评估。*We adopt an operator-level similarity kernel induced by density states.*（不用 "quantum measurement"） | `match`；A-系列 + 多数据集；05_experiment_plan | RQ3 |
+| **C1（★★）** | **Preference evolution as constrained density-state transition**：把用户兴趣演化建模为满足量子态约束（PSD+trace）的概率状态转移过程（而非"首次用 density 表示"）。*We formulate user preference evolution as a constrained density state transition process.*（关键词：state transition，不是 representation） | `StateProjection` + `StateTransition`；03_theory §2/§3；E001-E003 | RQ1/RQ2 |
+| **C2（★★★ 唯一核心）** | **Legality-preserving evolution**：保 PSD+trace 的凸组合状态演化（传统 hidden state 无约束：norm explosion / uninterpretable / arbitrary transition）。*We propose a legality-preserving preference transition mechanism based on convex density-state evolution.*（理论贡献） | `StateTransition`；03_theory §3；E004（约束消融） | RQ3（Theory） |
+| **C3（★★）** | **Preference uncertainty modeling**：density 谱 = 多兴趣同时存在（mixture），比 vector 更能表达兴趣不确定性/竞争。*Density states capture multiple concurrent interests via their spectrum, providing interpretable preference uncertainty.*（对 WWW reviewer 最易接受；配合 entropy 分析） | 谱分解 + entropy $H(\rho)=-\mathrm{Tr}(\rho\log\rho)$；RQ4 | RQ4 |
 
 > 写作注意：**不得写"首次 density"**；必须显式写 *Different from DMPEN that uses density matrices as second-order feature representations for RNNs, we investigate density operators as dynamic preference states with explicit legality-preserving evolution.*
+
+## 3.5 Method 数学定义冻结（2026-08-03 定稿，先冻结再实验）
+- **状态**：$\rho_t = \dfrac{L_t L_t^\top}{\mathrm{Tr}(L_t L_t^\top)}$，$L_t=\mathrm{Linear}(h_t)\in\mathbb{R}^{d\times r}$（PSD + trace=1）。
+- **演化（transition）**：$\rho_{t+1}=\alpha\,\rho_t+(1-\alpha)\,\rho_{i_t}$，固定 $\alpha$（扫描 0.1–0.9）为主；learnable/adaptive 作 extension。
+- **打分（score）**：$s(u,i)=\mathrm{Tr}(\rho_u\rho_i)$（Hilbert–Schmidt / operator-level kernel）。
+- **损失（loss）**：**主 = BPR** $-\log\sigma(s^+-s^-)$（与 SASRec/BERT4Rec/GRU4Rec 可比）；**消融 = BCE**（配合 logit 变换）；fidelity loss 作 quantum-specific ablation。
+- ⚠️ static vs dynamic 公平性：二者基于**相同** SASRec 编码器输出 $h_t$，仅差"演化"操作（见 §4.1），对比公平。
 
 ---
 
 ## 4. 实验路线（Experiment Line）
 
-### 4.1 主线（2026-08-03 定稿重设计）
-| 实验 | 对比 | 目的 | 回答 |
+### 4.1 主实验：四阶递进逻辑（2026-08-03 二次定稿）
+> 核心叙事：**Vector < Density Feature < Density State < Dynamic Evolution**——把"DMPEN 的 density 提升"与"我们的 state/evolution 提升"逐步拆开。
+
+| 阶梯 | Baseline / 变体 | 回答 | RQ |
 |---|---|---|---|
-| **E000** | **DMPEN reproduction**（density-as-feature + RNN） | 复现并证明 density feature ≠ density state | 关键对照 |
-| **E001** | Vector vs Density（同 encoder、同参数量） | density state 是否提升表示 | RQ1 |
-| **E002** | Static density vs Dynamic density | 显式演化是否提升序列建模 | **RQ2（核心）** |
-| **E003** | Evolution mechanism：EMA（fixed α 扫描 0.1–0.9）vs learnable α | 状态惯性机制 + adaptive 增益 | RQ2 |
-| **E004** | Ablation：去掉 PSD 约束 / trace 归一化 | 证明"不是普通 matrix" | RQ2 |
+| A | **Vector**（SASRec，embedding→SASRec） | 基准 | - |
+| B | **Density Feature**（模拟 DMPEN：$ee^\top$→flatten→SASRec） | density representation 是否有效 | RQ1 |
+| C | **Density State static**（$\rho_T$，不演化） | state 是否有效 | RQ1 |
+| D | **Density Dynamic**（$\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_i$，最终模型） | 动态演化是否有效 | **RQ2** |
+
+**RQ 定义（2026-08-03 二次定稿）**
+- RQ1 **Representation**：density state 是否优于 vector / density feature？（A vs B vs C）
+- RQ2 **Evolution**：动态演化是否优于静态？（C vs D）
+- RQ3 **Theory**：PSD+trace 约束是否重要？（消融：remove PSD / remove trace / unconstrained matrix）
+- RQ4 **Uncertainty**：density 为何有效？（$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$ 熵分析用户兴趣变化）
 
 **主表 baseline（6 个，不多加）**：GRU4Rec / SASRec / BERT4Rec / **DMPEN** / Ours-static / Ours-dynamic
-> 暂缓：Caser / Gaussian / MIND / ComiRec（WWW 不是 baseline 越多越好，先证明 idea）。
+> 暂缓：Caser / Gaussian / MIND / ComiRec（先证明 idea）。
+> 公平性：static 与 dynamic 基于**相同**编码器输出，仅差演化操作（信息量相同）。
 
 ### 4.2 附实验（增强证据）
 | 分析 | 内容 | 目的 |
@@ -127,6 +141,7 @@
 | 2026-08-02 | 整稿审阅（GPT） | ① 定位从"quantum 推荐"转向"dynamic density-state"；② 贡献重排（evolution 第一）；③ 增 Constraint Gap；④ CPTP/Born 弱化；⑤ 多数据集多 baseline；⑥ interest-shift 作为核心分析；⑦ 修 Tr loss + 加 adaptive α | 全部采纳：§1/§2/§3/§4 已改；新增 04_related_work/05_experiment_plan；03_theory 弱化 CPTP/Born；RQ 对齐 | 定位更稳，防"只是换 distribution 表示"攻击 |
 | 2026-08-03 | DMPEN 精读（GPT） | 发现 DMPEN(DASFAA 2019) 已做 density matrix + RNN 序列演化 → **"首次 density+sequential" 不成立**；创新点迁移到 "dynamic density state evolution + legality"；必须加 DMPEN baseline；标题避免撞车 | 全部采纳：§1/§2/§3/§4 已改；04_related_work 记入 DMPEN 详情；定位改为"density 状态机 vs 特征" | 避免被 2019 论文直接击穿 |
 | 2026-08-03 | 定位定稿（GPT） | ① 冻结论文定位（不继续扩实验/代码）；② C1 降级、C2 唯一核心；③ 主表 baseline 精简为 6 个（GRU4Rec/SASRec/BERT4Rec/DMPEN/Ours-static/dynamic），Caser/Gaussian/MIND 暂缓；④ 实验重设计（E000 DMPEN 复现 + E001-E004）；⑤ adaptive α 不核心（fixed α 扫描 0.1–0.9）；⑥ Loss 主=logit+BCE、ablation=BPR；⑦ 03_theory 删 Kraus/depolarization/Born，保留 P1/P2/P3 | 全部采纳：§1/§2/§3/§4 重写为英文定稿；05/03 同步 | 创新叙事收紧，防"DMPEN 已做"攻击 |
+| 2026-08-03 | 二次定位 review（GPT） | ① 强化"动态概率状态/uncertainty"叙事、弱化 quantum；② C1 改 state transition、C3 改 uncertainty modeling；③ **主损失改 BPR**（BCE 消融）；④ 实验改四阶递进（Vector<Density Feature<Density State<Dynamic）+ RQ1-4 + entropy 分析；⑤ 标题无 quantum；⑥ 先冻结 Method 数学定义再实验 | 全部采纳：§1.2/§3/§3.5/§4 更新；`--loss` 默认改 bpr | 叙事最稳、可比性最强 |
 
 ---
 
