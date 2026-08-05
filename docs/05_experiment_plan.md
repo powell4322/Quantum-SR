@@ -42,7 +42,7 @@
 | RQ | 实验 | 对比（同参数量） | 指标 |
 |---|---|---|---|
 | RQ1 | E001 | V vs VE vs DF vs DS | NDCG@10 / HR@10 |
-| RQ2 | E002 | DS vs DDS；E003 α 扫描 0.1–0.9 | NDCG@10 / HR@10 |
+| RQ2 | E002 | DS vs DDS；E003 α 扫描 0.1–0.9 + **ρ₀ 初始化消融（I/d / 首观测 / 可学习）** | NDCG@10 / HR@10 |
 | RQ3 | E004 | remove PSD / remove trace / unconstrained matrix | NDCG@10 / HR@10 |
 | RQ4 | E005 | entropy 分组（低/中/高）+ interest-shift（前 50 A → 后 50 B） | entropy / adaptation steps |
 

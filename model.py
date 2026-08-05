@@ -46,6 +46,23 @@ class StateProjection(torch.nn.Module):
         return rho
 
 
+class DensityFeatureInput(torch.nn.Module):
+    """DMPEN 式：把 item embedding 提升为低秩密度特征（flatten L）再映射回 d 维，
+    作为编码器输入（density-as-feature，非状态）。"""
+
+    def __init__(self, hidden_units, rank=1):
+        super(DensityFeatureInput, self).__init__()
+        self.rank = rank
+        self.proj = torch.nn.Linear(hidden_units, hidden_units * rank, bias=False)
+        self.back = torch.nn.Linear(hidden_units * rank, hidden_units)
+
+    def forward(self, emb):
+        # emb: (..., d) -> L: (..., r, d) -> flatten (..., r*d) -> back to d
+        L = self.proj(emb).view(*emb.shape[:-1], self.rank, emb.shape[-1])
+        feat = L.reshape(*emb.shape[:-1], -1)
+        return self.back(feat)
+
+
 class StateTransition(torch.nn.Module):
     """动态状态演化: rho_t = alpha * rho_{t-1} + (1-alpha) * rho_{i_t}。
 
@@ -106,7 +123,7 @@ class SASRec(torch.nn.Module):
             # self.pos_sigmoid = torch.nn.Sigmoid()
             # self.neg_sigmoid = torch.nn.Sigmoid()
 
-        # === quantum-inspired variants (vector / state / dynamic) ===
+        # === variants: vector / state / dynamic / vector_evolve (VE) / density_feature (DF) ===
         self.variant = getattr(args, 'variant', 'vector')
         self.state_rank = getattr(args, 'state_rank', 1)
         self.transition_mode = getattr(args, 'transition', 'fixed')
@@ -114,6 +131,7 @@ class SASRec(torch.nn.Module):
 
         self.state_proj = None
         self.state_transition = None
+        self.df_input = None
         if self.variant in ('state', 'dynamic'):
             self.state_proj = StateProjection(args.hidden_units, rank=self.state_rank)
             if self.variant == 'dynamic':
@@ -122,6 +140,9 @@ class SASRec(torch.nn.Module):
                     learnable=(self.transition_mode == 'learnable'),
                     init_alpha=self.transition_alpha,
                 )
+        if self.variant == 'density_feature':
+            # DMPEN-style: lift item embeddings to density features before the encoder
+            self.df_input = DensityFeatureInput(args.hidden_units, rank=self.state_rank)
 
     def _to_state_sequence(self, log_feats):
         """把 (U, T, C) 的向量序列转成 (U, T, C, C) 的密度矩阵序列；
@@ -141,6 +162,19 @@ class SASRec(torch.nn.Module):
             rho_seq = torch.stack(outputs, dim=1)
         return rho_seq
 
+    def _vector_evolve(self, log_feats):
+        """VE：对编码器输出 (U,T,C) 沿时间做 EMA（向量凸组合）。
+        用于回应"凸组合只是 EMA"——与 DDS 的密度状态演化对比（fixed alpha）。"""
+        T = log_feats.shape[1]
+        alpha = float(self.transition_alpha)
+        outs = [log_feats[:, 0]]
+        prev = log_feats[:, 0]
+        for t in range(1, T):
+            cur = alpha * prev + (1.0 - alpha) * log_feats[:, t]
+            outs.append(cur)
+            prev = cur
+        return torch.stack(outs, dim=1)
+
     @staticmethod
     def _logit_score(s, eps=1e-7):
         """把 [0,1] 的 Tr 相似度分数映射到无界 logits（logit 变换），
@@ -151,6 +185,9 @@ class SASRec(torch.nn.Module):
 
     def log2feats(self, log_seqs): # TODO: fp64 and int64 as default in python, trim?
         seqs = self.item_emb(torch.LongTensor(log_seqs).to(self.dev))
+        if self.variant == 'density_feature':
+            # density-as-feature 输入（模拟 DMPEN：把 item 提升为密度特征再进编码器）
+            seqs = self.df_input(seqs)
         seqs *= self.item_emb.embedding_dim ** 0.5
         poss = np.tile(np.arange(1, log_seqs.shape[1] + 1), [log_seqs.shape[0], 1])
         # TODO: directly do tensor = torch.arange(1, xxx, device='cuda') to save extra overheads
@@ -190,7 +227,13 @@ class SASRec(torch.nn.Module):
             rho_neg = self.state_proj(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
             pos_logits = self._logit_score((rho_seq * rho_pos).sum(dim=(-1, -2)))  # Tr → logits
             neg_logits = self._logit_score((rho_seq * rho_neg).sum(dim=(-1, -2)))
-        else:
+        elif self.variant == 'vector_evolve':
+            evolved = self._vector_evolve(log_feats)  # (U, T, C) EMA
+            pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
+            neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
+            pos_logits = (evolved * pos_embs).sum(dim=-1)
+            neg_logits = (evolved * neg_embs).sum(dim=-1)
+        else:  # vector / density_feature（dot 打分）
             pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
             neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
 
@@ -211,7 +254,12 @@ class SASRec(torch.nn.Module):
             item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
             rho_item = self.state_proj(item_embs)  # (U, I, C, C)
             logits = self._logit_score((rho_user * rho_item).sum(dim=(-1, -2)))  # Tr → logits
-        else:
+        elif self.variant == 'vector_evolve':
+            evolved = self._vector_evolve(log_feats)  # (U, T, C) EMA
+            final_feat = evolved[:, -1, :]
+            item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
+            logits = item_embs.matmul(final_feat.unsqueeze(-1)).squeeze(-1)
+        else:  # vector / density_feature（dot 打分）
             final_feat = log_feats[:, -1, :] # only use last QKV classifier, a waste
 
             item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev)) # (U, I, C)

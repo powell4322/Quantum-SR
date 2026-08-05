@@ -60,18 +60,12 @@ $$\rho_t = \frac{L_t L_t^\top}{\mathrm{Tr}(L_t L_t^\top)}, \qquad L_t = W h_t \i
 - 除以迹后 $\mathrm{Tr}(\rho)=1$；
 - $r=1$ 时为纯态（$\mathrm{rank}=1$），$r>1$ 时为混合态。
 
-### 2.4 参数量与有效自由度（精确分析，勿再写"更多自由度"）
+### 2.4 与向量表示的关系（v1.2：删除 dof 公式，改为 rank-1 嵌入）
 
-- 参数量：$L$ 有 $dr$ 个参数。
-- 有效自由度：$\rho=LL^\top$ 对 $L$ 有**正交旋转歧义**（$L\mapsto LQ,\ Q\in O(r)$ 不改变 $\rho$），且受 trace=1 约束，故
-
-$$\mathrm{dof}(\rho)=dr-\frac{r(r-1)}{2}-1$$
-
-- $r=1$：$\mathrm{dof}=d-1$，恰好是单位向量所在球面 $S^{d-1}$ 的自由度 → **纯态与向量同量级**（"state 是 vector 的自然推广"的关键证据）。
-- $r=d$：$\mathrm{dof}=\frac{d(d+1)}{2}-1$，即 trace 固定的对称矩阵。
-
-> 结论表述（论文用）：*Low-rank density operators provide a structured second-order representation with controllable rank complexity.* —— 卖点是 **second-order 结构** 与 **rank 可控性**，不是"更多自由度"。
-> ⚠️ 对应实验：A-1 维度效率（vector $d=64$ vs state $d=32,r=4$，固定参数量）。
+- 嵌入映射 $\phi(h)=hh^\top$（rank-1）：$\phi(\mathbb{R}^d)\subset\mathcal{D}_d$ → **vector 是 density state 的特例**。
+- $r=1$ 打分退化为平方余弦（§4.2 P3）。
+- 表述：*structured second-order representation with controllable rank*（不再声称"更多自由度"）。
+> ⚠️ 对应实验：A-1 维度效率（vector vs state，固定参数量）。
 
 ---
 
@@ -99,7 +93,7 @@ $$\rho_{t+1} = \alpha\,\rho_t + (1-\alpha)\,\rho_{i_t}, \qquad \alpha \in [0,1]$
 
 ### 3.4 与经典方法的关系（回应 "Why not GRU?"）
 
-- **固定 $\alpha$**：展开得 $\rho_T=\alpha^{T-1}\rho_1+(1-\alpha)\sum_{k=1}^{T-1}\alpha^{T-1-k}\rho_{i_k}$，即**指数滑动平均（EMA）/ 几何加权**——旧兴趣按 $\alpha$ 指数衰减，天然具备遗忘机制；语义上等价于贝叶斯滤波的信息合并。
+- **固定 $\alpha$**：展开得 $\rho_T=\alpha^{T-1}\rho_1+(1-\alpha)\sum_{k=1}^{T-1}\alpha^{T-1-k}\rho_{i_k}$，即**指数滑动平均（EMA）/ 几何加权**——旧兴趣按 $\alpha$ 指数衰减，天然具备遗忘机制。
 - **与 GRU/门控的区别（论文卖点）**：凸组合结构保证**中间状态永远是合法密度算子（PSD+trace 保持）**——这是 GRU/门控在表示层面不具备的硬约束。
 
 | | RNN/GRU | 我们的凸组合 |

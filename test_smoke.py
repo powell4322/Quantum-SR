@@ -89,7 +89,7 @@ def run_variant(variant, rank=1):
 
 
 if __name__ == "__main__":
-    for v in ("vector", "state", "dynamic"):
+    for v in ("vector", "state", "dynamic", "vector_evolve", "density_feature"):
         run_variant(v)
     run_variant("state", rank=4)
     print("\nALL SMOKE TESTS PASSED")

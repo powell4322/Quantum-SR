@@ -35,10 +35,11 @@ $$\mathrm{Proj}(h)=\frac{LL^\top}{\mathrm{Tr}(LL^\top)},\qquad L=\mathrm{reshape
 - item 状态：$\rho_i=\mathrm{Proj}(e_i)$（与用户状态共享或独立 Proj，见实验配置）。
 - **复杂度（v1.1）**：参数增量 $O(dr)$（Proj 层）；打分 $O(d^2)$（$\mathrm{Tr}(\rho_u\rho_i)$ 逐元素乘加）；序列演化 $O(Td^2)$。$d$ 通常 $\le100$，可接受。
 
-**参数量 vs 自由度**：
-- 参数量 $=dr$；
-- 有效自由度（满秩、$L$ 可辨情形）$\mathrm{dof}=dr-\frac{r(r-1)}{2}-1$；
-- ⚠️ 该式在 $L$ 秩退化时需修正（见 `08_math_checklist.md` B5）；论文仅表述为 *structured second-order representation with controllable rank*。
+**与向量表示的关系（v1.2，删除 dof 公式）**：
+- 嵌入映射 $\phi(h)=hh^\top$（rank-1）：$\phi:\mathbb{R}^d\to\mathcal{D}_d$ → **vector 是 density state 的特例**（$\phi(\mathbb{R}^d)\subset\mathcal{D}_d$）。
+- $r=1$ 时打分退化为平方余弦（P3）：*vector similarity is a special case of density similarity*。
+- $r>1$（混合态）表示**潜在偏好方向上的分布**（谱 $\sum_k\lambda_k v_kv_k^\top$），对应 multi-interest + uncertainty（H4）。
+- 表述：*density state provides a structured second-order representation with controllable rank*。
 
 ---
 
@@ -73,7 +74,8 @@ $$s(u,i)=\mathrm{Tr}(\rho_u\,\rho_i)$$
 
 ## 7. 熵与不确定性分析（RQ4）
 
-von Neumann 熵：$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$（$\rho$ 奇异时按惯例 $0\cdot\log0\to0$）。
+von Neumann 熵：$H(\rho)=-\mathrm{Tr}(\rho\log\rho)$。
+- **数值实现（v1.2）**：`eigvals = torch.clamp(torch.linalg.eigvalsh(rho), min=1e-8); H = -(eigvals * torch.log(eigvals)).sum(-1)`（ρ PSD → 用 `eigvalsh`；clamp 防 0 特征值导致 NaN）。
 - 低熵 $\Rightarrow$ 兴趣集中；高熵 $\Rightarrow$ 兴趣多元。
 - 用于：按 $H(\rho_u)$ 分低/中/高组，比较各组下 DDS 相对 V 的增益（验证 C4）。
 
@@ -112,13 +114,20 @@ $\rho_1=\alpha\frac{I}{d}+(1-\alpha)\hat\rho_1$；
 **命题**：在 $\mathcal{D}_d$ 中，$\rho_0=I/d$ 是熵最大的状态，$H(\rho_0)=\log d$。
 **证明**：von Neumann 熵是凹函数，在均匀分布（$I/d$）取最大 $\log d$（Jensen）。∎
 
+### 约束诱导正则化（v1.2 论证，替代"更多自由度"）
+普通向量 EMA $h_t=\alpha h_{t-1}+(1-\alpha)e_t$ 在 $\mathbb{R}^d$ 中无约束；密度状态演化在 $\mathcal{D}_d$ 中，而 $\mathcal{D}_d$ 是**紧凸集**：
+1. **范数有界**（状态不会爆炸）；
+2. **相似度有界** $0\le\mathrm{Tr}(\rho_u\rho_i)\le1$（P2）；
+3. **演化不发散**（凸组合仍在 $\mathcal{D}_d$）。
+→ 表述：*legality-preserving transition acts as implicit regularization, providing a stable state space*（不声称提高性能，效果由 E004 实验检验）。
+
 ---
 
 ## 9. 假设（Hypotheses，实验可验证；v1.1：由"猜想"改为"假设"）
 
 | # | 假设 | 合理理由 | 验证实验 |
 |---|---|---|---|
-| **H1** 表示优势 | 同参数量下，DS/DDS 优于 V 与 DF（RQ1） | second-order 结构（P3）+ rank 可控（§3） | E001 |
+| **H1** 表示优势 | 同参数量下，DS/DDS 优于 V 与 DF（RQ1） | rank-1 嵌入含向量（P3）+ 混合态表示不确定性分布（§3）+ 约束正则化（§8） | E001 |
 | **H2** 演化优势 | DDS 优于 DS（RQ2） | 显式遗忘/惯性（P4）+ 合法演化（P1） | E002 |
 | **H3** 约束价值 | 移除 PSD/trace 后性能下降（RQ3） | 合法性约束排除病态演化（norm explosion 等）；⚠️ 去约束后状态无界、得分尺度变，需重调损失 | E004（消融） |
 | **H4** 不确定性关联 | 高熵用户上 DDS 增益更大（RQ4） | 高熵=兴趣多元=更需要概率状态表达 | entropy 分组 |
