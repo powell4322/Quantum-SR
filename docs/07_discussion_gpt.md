@@ -72,3 +72,41 @@
 3. Loss 用哪种最稳（logit+BCE / fidelity / BPR / 温度）？要不要全做成消融？
 4. 主实验 E001-E004 的设计能否支撑 RQ1/RQ2？
 5. adaptive α 和 interest-shift 实验的必要性/优先级？
+
+---
+
+## 五、理论审核稿（2026-08-05，可直接复制给 GPT）
+
+> 用途：把当前理论成熟度 + 疑问 + 想法整理成一段，让 GPT 对理论给出审查意见。
+
+```
+[理论审核 · 阶段提交]
+- 项目：动态密度状态建模用于不确定性感知序列推荐（Dynamic Preference Density State Model）
+- 核心文档：docs/09_theory_v1.md（理论定稿：全部公式 + 命题 P1–P5 + 假设 H1–H4）；docs/08_math_checklist.md（逐条核查）
+- 目标会议：WWW（标题无 quantum；卖点 = legality-preserving density state evolution）
+
+## 理论成熟度
+已冻结且可靠：核心对象（PSD+trace=1）、Proj 构造（ρ=LL^T/Tr，L=reshape(Wh)）、演化 ρ_t=α ρ_{t-1}+(1-α)Proj(h_t)（含 ρ_0=I/d）、打分 Tr(ρ_u ρ_i)、Loss 主 BPR。
+命题 P1–P5（合法性 / 有界性[0,1] / 纯态桥接 / EMA 展开 / 最大熵）已有证明，P1、P4 已验证。
+悬而未决：dof 公式、second-order 优势论证、凸组合新颖性、ρ_0 与温度、entropy 数值。
+
+## 我的疑问（请逐条判断）
+Q1. dof 公式（dr−r(r−1)/2−1）在 L 秩退化时失效，且自由度≠表达能力——保留还是删除？
+Q2. "second-order 优势"目前只有假设 H1 无定理；r=1 时 s=(u·i)^2；r>1 时 Tr(ρ_u ρ_i) 额外表达了什么？能否形式化"密度状态 ⊇ 向量组合"？
+Q3. 凸组合=EMA，与 vector 空间 EMA（VE）的本质区别目前只有 P1（合法性）——够吗？需不需要补"合法性约束为何有用"（H3）论证？
+Q4. ρ_0=I/d 会不会稀释首观测？要不要对比可学习 ρ_0 或首观测初始化？
+Q5. s∈[0,1] 与 BPR：分数集中时梯度会否失效？要不要温度缩放 s^τ？
+Q6. 用户状态与 item 状态共享 Proj（当前代码）会不会限制匹配？要不要独立 Proj 消融？
+Q7. entropy H(ρ) 数值稳定性（特征值小→log 可能 NaN）如何处理？
+
+## 我的想法（请评估可行性）
+I1. VE 对照作机制分析：VE 提升→演化本身有用；仅 DDS 提升→密度状态+演化是关键。二分支很有信息量。
+I2. 温度缩放打分 s^τ 缓解 BPR 梯度集中。
+I3. 可学习 ρ_0（仍是合法密度算子）作 ablation。
+I4. entropy 谱分解可视化案例增强可解释性。
+I5. 聚合变体 ρ_u=Σ w_t ρ_t（attention）回应 fairness。
+I6. 泛化/信息论论据（低秩=正则化，future work）。
+I7. item 独立 Proj 消融。
+
+请给出：1) 哪些理论必须补/哪些该删（尤其 Q1/Q2）；2) 哪些想法值得做（I1–I7 排序）；3) 理论是否足以支撑 WWW 投稿，还缺什么。
+```
