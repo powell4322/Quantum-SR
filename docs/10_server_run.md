@@ -7,7 +7,7 @@
 
 ## 0. 前置条件（一次性）
 - 系统：Linux + GPU（`nvidia-smi` 确认 CUDA 版本，决定 torch 的 `cu1XX`）
-- 已安装：`git`、`python3`（3.10+）、`python3-venv`
+- 已安装：`git`、**conda**（miniconda / anaconda）
 - 已配置 GitHub 认证（否则 `git clone` 会要求账号）
 
 ## 1. 一键命令（复制整段，粘贴到服务器终端执行）
@@ -19,9 +19,10 @@ set -e
 git clone https://github.com/powell4322/Quantum-SR.git
 cd Quantum-SR
 
-# ---------- 2) 建虚拟环境 + 安装依赖（无 uv，用 requirements.txt） ----------
-python3 -m venv .venv
-source .venv/bin/activate
+# ---------- 2) 建 conda 环境 + 安装依赖（环境名 ddsr，可自定） ----------
+# 若环境已存在，conda create 会报错，故先检查再创建
+conda env list | grep -q '^ddsr ' || conda create -n ddsr python=3.12 -y
+conda activate ddsr
 pip install --upgrade pip
 # ⚠️ 先按 nvidia-smi 的 CUDA 版本装 cu 版 torch（cu118 / cu121 / cu124 ...），再装其余依赖
 pip install torch --index-url https://download.pytorch.org/whl/cu121
@@ -47,7 +48,7 @@ python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr 
 ### Step 1 — 主实验 · ml-1m（先验证四阶递进趋势）
 验证目标：**V < DF < DS < DDS**（RQ1/RQ2），且 **DDS − DS 增益 ≠ VE 的 EMA 增益**。
 ```bash
-source .venv/bin/activate && cd Quantum-SR
+conda activate ddsr && cd Quantum-SR
 python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
     --variants vector density_feature state dynamic vector_evolve --state_rank 1 --tag main
 ```
@@ -83,7 +84,7 @@ python main.py --dataset ml-1m --train_dir rq3_dds_dot --variant dynamic --match
 ## 5. 常见问题
 | 现象 | 处理 |
 |---|---|
-| `python` 找不到 | 先 `source .venv/bin/activate` |
+| `python` 找不到 | 先 `conda activate ddsr`（或你自己的环境名） |
 | torch 装不上 / CUDA 不识别 | `nvidia-smi` 查版本，改 `--index-url .../whl/cu1XX` |
 | 显存不足 OOM | `--batch_size 64` 或 `--maxlen 100` 或 `--hidden_units 32` |
 | 数据读不到 | 确认 `data/{dataset}.txt` 存在且格式为 `user item` |
