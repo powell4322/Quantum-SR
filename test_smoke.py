@@ -74,6 +74,18 @@ def run_variant(variant, rank=1, matching="trace"):
         rho_item = model.state_proj(item_embs)
         check_state_legality(rho_item, "item rho")
 
+    # 低秩打分 ≡ 显式 rho 逐元素（数学等价性校验，防优化改语义）
+    if variant == "state" and matching == "trace":
+        L_u, n_u = model.state_proj.lowrank(log_feats)
+        L_i, n_i = model.state_proj.lowrank(model.item_emb(torch.LongTensor(pos_seqs)))
+        s_low = model._hs_lowrank(L_u, n_u, L_i, n_i)
+        rho_u = model.state_proj(log_feats)
+        rho_i = model.state_proj(model.item_emb(torch.LongTensor(pos_seqs)))
+        s_tr = (rho_u * rho_i).sum(dim=(-1, -2))
+        err = (s_low - s_tr).abs().max().item()
+        assert err < 1e-4, "低秩打分与 Tr 不一致: {}".format(err)
+        print("    [OK] low-rank == trace: max_err={:.2e}".format(err))
+
     # predict 路径
     item_idx = torch.randint(1, 51, (B, I)).numpy()
     logits = model.predict(user_ids, log_seqs, item_idx)

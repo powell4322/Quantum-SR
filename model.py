@@ -36,13 +36,17 @@ class StateProjection(torch.nn.Module):
         self.rank = rank
         self.proj = torch.nn.Linear(hidden_units, hidden_units * rank, bias=False)
 
+    def lowrank(self, inputs):
+        """返回低秩因子 L (..., r, C) 与 ||L||_F^2（低秩打分用，避免构造 C×C 矩阵）。"""
+        L = self.proj(inputs).view(*inputs.shape[:-1], self.rank, self.hidden_units)
+        norm = (L * L).sum(dim=(-1, -2))  # ||L||_F^2
+        return L, norm
+
     def forward(self, inputs):
         # inputs: (..., C) -> L: (..., r, C)
-        L = self.proj(inputs).view(*inputs.shape[:-1], self.rank, self.hidden_units)
+        L, norm = self.lowrank(inputs)
         rho = torch.matmul(L.transpose(-1, -2), L)  # (..., C, C), PSD
-        trace = torch.diagonal(rho, dim1=-2, dim2=-1).sum(dim=-1)  # (...)
-        trace = trace.unsqueeze(-1).unsqueeze(-1)  # (..., 1, 1)
-        rho = rho / trace.clamp_min(1e-8)  # normalize to trace=1
+        rho = rho / norm.unsqueeze(-1).unsqueeze(-1).clamp_min(1e-8)  # normalize to trace=1
         return rho
 
     def direction(self, inputs):
@@ -198,6 +202,27 @@ class SASRec(torch.nn.Module):
         return torch.log(s / (1.0 - s))
 
     @staticmethod
+    def _hs_lowrank(L_a, norm_a, L_b, norm_b, eps=1e-8):
+        """Tr(ρ_a ρ_b) 的低秩实现：||L_a^T L_b||_F^2 / (||L_a||_F^2 · ||L_b||_F^2)。
+
+        数学上等于显式构造 ρ 后逐元素相乘（见 09_research_positioning_v2 §10），
+        但避免 O(C^2) 的中间 C×C 矩阵，复杂度 O(C r^2)。
+        """
+        cross = torch.matmul(L_a, L_b.transpose(-1, -2))  # (..., r, r)
+        fro = (cross * cross).sum(dim=(-1, -2))
+        return fro / (norm_a * norm_b).clamp_min(eps)
+
+    @staticmethod
+    def _hs_mixed(rho, L_b, norm_b, eps=1e-8):
+        """Tr(ρ_a ρ_b)：ρ_a 为密度矩阵（如 dynamic 演化后的混合态），ρ_b = L_b^T L_b / ||L_b||^2。
+
+        = Tr(L_b ρ_a L_b^T) / ||L_b||^2（迹循环），复杂度 O(C r^2) 而非 O(C^2）。
+        """
+        tmp = torch.matmul(L_b, torch.matmul(rho, L_b.transpose(-1, -2)))  # (..., r, r)
+        fro = torch.diagonal(tmp, dim1=-2, dim2=-1).sum(dim=-1)
+        return fro / norm_b.clamp_min(eps)
+
+    @staticmethod
     def state_entropy(rho, eps=1e-8):
         """von Neumann 熵 H(ρ) = -Tr(ρ log ρ)（RQ4 不确定性分析用）。
 
@@ -246,11 +271,22 @@ class SASRec(torch.nn.Module):
 
         if self.variant in ('state', 'dynamic'):
             if self.matching == 'trace':
-                rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-                rho_pos = self.state_proj(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))  # (U, T, C, C)
-                rho_neg = self.state_proj(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
-                pos_logits = self._logit_score((rho_seq * rho_pos).sum(dim=(-1, -2)))  # Tr → logits
-                neg_logits = self._logit_score((rho_seq * rho_neg).sum(dim=(-1, -2)))
+                if self.variant == 'dynamic':
+                    # 演化必须在 rho（C×C）层做（凸组合保持合法性）——这是唯一必须构造 C×C 的地方；
+                    # 打分用低秩（item 侧 L，O(C r^2)），避免 rho*rho 的 O(C^2) 逐元素乘。
+                    rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                    L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                    L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                    pos_s = self._hs_mixed(rho_seq, L_pos, norm_pos)  # (U, T)
+                    neg_s = self._hs_mixed(rho_seq, L_neg, norm_neg)
+                else:  # state：完全低秩（不构造 rho），耗时接近 vector
+                    L_user, norm_user = self.state_proj.lowrank(log_feats)
+                    L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                    L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                    pos_s = self._hs_lowrank(L_user, norm_user, L_pos, norm_pos)
+                    neg_s = self._hs_lowrank(L_user, norm_user, L_neg, norm_neg)
+                pos_logits = self._logit_score(pos_s)
+                neg_logits = self._logit_score(neg_s)
             else:  # matching=dot：一阶方向 dot（RQ3 对照；dynamic 时对方向做向量 EMA）
                 u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
                 if self.variant == 'dynamic':
@@ -282,11 +318,19 @@ class SASRec(torch.nn.Module):
 
         if self.variant in ('state', 'dynamic'):
             if self.matching == 'trace':
-                rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-                rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) only use last state
                 item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
-                rho_item = self.state_proj(item_embs)  # (U, I, C, C)
-                logits = self._logit_score((rho_user * rho_item).sum(dim=(-1, -2)))  # Tr → logits
+                if self.variant == 'dynamic':
+                    rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                    rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) last state
+                    L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
+                    s = self._hs_mixed(rho_user, L_item, norm_item)  # (U, I)
+                else:  # state：完全低秩
+                    L_user, norm_user = self.state_proj.lowrank(log_feats)
+                    L_user = L_user[:, -1, :, :].unsqueeze(1)  # (U, 1, r, C)
+                    norm_user = norm_user[:, -1].unsqueeze(1)  # (U, 1)
+                    L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
+                    s = self._hs_lowrank(L_user, norm_user, L_item, norm_item)
+                logits = self._logit_score(s)
             else:  # matching=dot：一阶方向 dot（RQ3 对照）
                 u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
                 if self.variant == 'dynamic':
