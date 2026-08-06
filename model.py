@@ -45,6 +45,17 @@ class StateProjection(torch.nn.Module):
         rho = rho / trace.clamp_min(1e-8)  # normalize to trace=1
         return rho
 
+    def direction(self, inputs):
+        """一阶方向向量（RQ3 的 dot matching 用）。
+
+        rank=1 时 rho = u u^T / ||u||^2，方向即 u（精确）；
+        rank>1 时取 r 个方向的均值作为近似主方向。
+        """
+        L = self.proj(inputs).view(*inputs.shape[:-1], self.rank, self.hidden_units)
+        u = L.mean(dim=-2)
+        u = u / u.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+        return u
+
 
 class DensityFeatureInput(torch.nn.Module):
     """DMPEN 式：把 item embedding 提升为低秩密度特征（flatten L）再映射回 d 维，
@@ -123,11 +134,14 @@ class SASRec(torch.nn.Module):
             # self.pos_sigmoid = torch.nn.Sigmoid()
             # self.neg_sigmoid = torch.nn.Sigmoid()
 
-        # === variants: vector / state / dynamic / vector_evolve (VE) / density_feature (DF) ===
+        # === variants（M0-M4 体系映射，见 docs/05_experiment_plan.md）===
+        #   vector (M0 SASRec) | density_feature (M1 DF) | state (M2 DS) | dynamic (M3 DDS)
+        #   vector_evolve (VE：向量空间 EMA，对照“凸组合只是 EMA”)
         self.variant = getattr(args, 'variant', 'vector')
         self.state_rank = getattr(args, 'state_rank', 1)
         self.transition_mode = getattr(args, 'transition', 'fixed')
         self.transition_alpha = getattr(args, 'transition_alpha', 0.9)
+        self.matching = getattr(args, 'matching', 'trace')  # trace | dot（RQ3 匹配消融）
 
         self.state_proj = None
         self.state_transition = None
@@ -183,6 +197,15 @@ class SASRec(torch.nn.Module):
         s = torch.clamp(s, eps, 1.0 - eps)
         return torch.log(s / (1.0 - s))
 
+    @staticmethod
+    def state_entropy(rho, eps=1e-8):
+        """von Neumann 熵 H(ρ) = -Tr(ρ log ρ)（RQ4 不确定性分析用）。
+
+        ρ 为 (..., C, C) 密度矩阵（PSD）；用 eigvalsh + clamp 保证数值稳定（特征值非负）。
+        """
+        eigvals = torch.clamp(torch.linalg.eigvalsh(rho), min=eps)
+        return -(eigvals * torch.log(eigvals)).sum(dim=-1)
+
     def log2feats(self, log_seqs): # TODO: fp64 and int64 as default in python, trim?
         seqs = self.item_emb(torch.LongTensor(log_seqs).to(self.dev))
         if self.variant == 'density_feature':
@@ -222,11 +245,20 @@ class SASRec(torch.nn.Module):
         log_feats = self.log2feats(log_seqs) # user_ids hasn't been used yet
 
         if self.variant in ('state', 'dynamic'):
-            rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-            rho_pos = self.state_proj(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))  # (U, T, C, C)
-            rho_neg = self.state_proj(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
-            pos_logits = self._logit_score((rho_seq * rho_pos).sum(dim=(-1, -2)))  # Tr → logits
-            neg_logits = self._logit_score((rho_seq * rho_neg).sum(dim=(-1, -2)))
+            if self.matching == 'trace':
+                rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                rho_pos = self.state_proj(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))  # (U, T, C, C)
+                rho_neg = self.state_proj(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                pos_logits = self._logit_score((rho_seq * rho_pos).sum(dim=(-1, -2)))  # Tr → logits
+                neg_logits = self._logit_score((rho_seq * rho_neg).sum(dim=(-1, -2)))
+            else:  # matching=dot：一阶方向 dot（RQ3 对照；dynamic 时对方向做向量 EMA）
+                u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
+                if self.variant == 'dynamic':
+                    u_seq = self._vector_evolve(u_seq)
+                pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
+                neg_embs = self.item_emb(torch.LongTensor(neg_seqs).to(self.dev))
+                pos_logits = (u_seq * pos_embs).sum(dim=-1)
+                neg_logits = (u_seq * neg_embs).sum(dim=-1)
         elif self.variant == 'vector_evolve':
             evolved = self._vector_evolve(log_feats)  # (U, T, C) EMA
             pos_embs = self.item_emb(torch.LongTensor(pos_seqs).to(self.dev))
@@ -249,11 +281,19 @@ class SASRec(torch.nn.Module):
         log_feats = self.log2feats(log_seqs) # user_ids hasn't been used yet
 
         if self.variant in ('state', 'dynamic'):
-            rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-            rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) only use last state
-            item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
-            rho_item = self.state_proj(item_embs)  # (U, I, C, C)
-            logits = self._logit_score((rho_user * rho_item).sum(dim=(-1, -2)))  # Tr → logits
+            if self.matching == 'trace':
+                rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) only use last state
+                item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
+                rho_item = self.state_proj(item_embs)  # (U, I, C, C)
+                logits = self._logit_score((rho_user * rho_item).sum(dim=(-1, -2)))  # Tr → logits
+            else:  # matching=dot：一阶方向 dot（RQ3 对照）
+                u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
+                if self.variant == 'dynamic':
+                    u_seq = self._vector_evolve(u_seq)
+                u_user = u_seq[:, -1, :].unsqueeze(1)  # (U, 1, C)
+                item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
+                logits = item_embs.matmul(u_user.transpose(-1, -2)).squeeze(-1)  # (U, I)
         elif self.variant == 'vector_evolve':
             evolved = self._vector_evolve(log_feats)  # (U, T, C) EMA
             final_feat = evolved[:, -1, :]

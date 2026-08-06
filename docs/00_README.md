@@ -13,6 +13,8 @@
 | `04_related_work.md` | **相关工作 / 防撞**：三方向对照 + 关键先例（🔴 DASFAA 2019 待精读） | 投稿前防撞、写 Related Works |
 | `05_experiment_plan.md` | **实验计划**：数据集 / baseline / 实验设计矩阵 / 运行命令 / 铁律 | 规划、跑实验 |
 | `06_usage_sasrec.md` | **代码使用说明**（怎么跑、参数） | 使用者 / 排查代码 |
+| `09_theory_v1.md` | **理论定稿 v1**（P1-P5 命题 + 证明、合法性演化、熵） | 写 Method / 理论论证 |
+| `10_server_run.md` | **服务器一键运行**（git + 装包 + 跑实验） | 上 GPU 服务器时 |
 
 ## 各司其职（避免重叠）
 
@@ -23,9 +25,9 @@
 - 防撞 / 引用 → `04_related_work.md`
 - 跑代码 → `06_usage_sasrec.md`
 
-## ⚠️ 当前最重要的事（2026-08-03）
+## ⚠️ 当前最重要的事（2026-08-06）
 
-`04_related_work.md` 发现 **DASFAA 2019 *Density Matrix Based Preference Evolution Networks*** 疑似先例（density matrix + preference evolution）——**写论文前必须精读原文确认差异**，否则有撞 idea 风险。
+**路线冻结：第一篇论文 = Dynamic Density State Transformer (DDST)。** 主线 = density operator state（M2 DS）+ legality-preserving evolution（M3 DDS）+ operator similarity（Tr）；不做 QDM-Former/量子纠缠主线。数据集定为 ml-1m / Beauty / Steam；指标统一 **R@10 / NDCG@10**（本协议下 HR@10 ≡ Recall@10）。详见 `05_experiment_plan.md` §0 与 `10_server_run.md`。
 
 > 注意：`.github/skills/` 下另有给 Copilot 自动加载的 skill（领域知识、实验协议），非人读文档，无需进本目录。
 

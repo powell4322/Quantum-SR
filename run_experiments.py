@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 
-TEST_RE = re.compile(r"test \(NDCG@10: ([\d.]+), HR@10: ([\d.]+)\)")
+TEST_RE = re.compile(r"test \(NDCG@10: ([\d.]+), Recall@10: ([\d.]+)\)")
 LOSS_RE = re.compile(r"loss in epoch (\d+) iteration (\d+): ([\d.]+)")
 
 
@@ -57,6 +57,7 @@ def run_one(args, variant, rank):
         "--transition", args.transition,
         "--eval_every", str(args.eval_every),
         "--loss", args.loss,
+        "--matching", args.matching,
     ]
     name = "{}_r{}".format(variant, rank)
 
@@ -80,7 +81,7 @@ def run_one(args, variant, rank):
         return (name, None, None, None)
 
     ndcg, hr, loss = parse_metrics(stdout)
-    print("[DONE] {} | time={:.1f}min | test NDCG@10={} HR@10={} | last_loss={}".format(
+    print("[DONE] {} | time={:.1f}min | test NDCG@10={} R@10={} | last_loss={}".format(
         name, elapsed, ndcg, hr, loss))
     return (name, ndcg, hr, loss)
 
@@ -103,6 +104,7 @@ def main():
     parser.add_argument("--dropout_rate", type=float, default=0.2)
     parser.add_argument("--eval_every", type=int, default=20)
     parser.add_argument("--loss", default="bpr", choices=["bce", "bpr"])
+    parser.add_argument("--matching", default="trace", choices=["trace", "dot"])
     args = parser.parse_args()
 
     os.makedirs("results", exist_ok=True)
@@ -116,7 +118,7 @@ def main():
     print("\n" + "=" * 70)
     print("SUMMARY (dataset={}, epochs={}, tag={})".format(args.dataset, args.epochs, args.tag))
     print("=" * 70)
-    header = "{:<16} {:>12} {:>12} {:>12}".format("variant", "NDCG@10", "HR@10", "last_loss")
+    header = "{:<16} {:>12} {:>12} {:>12}".format("variant", "NDCG@10", "R@10", "last_loss")
     print(header)
     print("-" * 52)
     baseline = None
@@ -136,7 +138,7 @@ def main():
     # 保存 CSV
     csv_path = os.path.join("results", "exp_{}.csv".format(args.tag or "latest"))
     with open(csv_path, "w", encoding="utf-8") as f:
-        f.write("variant,ndcg10,hr10,last_loss\n")
+        f.write("variant,ndcg10,recall10,last_loss\n")
         for name, ndcg, hr, loss in rows:
             f.write("{},{},{},{}\n".format(
                 name,

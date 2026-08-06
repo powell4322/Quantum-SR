@@ -33,6 +33,7 @@ parser.add_argument('--transition', default='fixed', type=str, choices=['fixed',
 parser.add_argument('--transition_alpha', default=0.9, type=float)
 parser.add_argument('--eval_every', default=20, type=int)
 parser.add_argument('--loss', default='bpr', type=str, choices=['bce', 'bpr'])
+parser.add_argument('--matching', default='trace', type=str, choices=['trace', 'dot'], help='RQ3 匹配消融：trace=Tr(rho_u rho_i)（HS），dot=一阶方向 dot')
 
 args = parser.parse_args()
 if not os.path.isdir(args.dataset + '_' + args.train_dir):
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     print('average sequence length: %.2f' % (cc / len(user_train)))
     
     f = open(os.path.join(args.dataset + '_' + args.train_dir, 'log.txt'), 'w')
-    f.write('epoch (val_ndcg, val_hr) (test_ndcg, test_hr)\n')
+    f.write('epoch (val_ndcg, val_r) (test_ndcg, test_r)\n')
     
     sampler = WarpSampler(user_train, usernum, itemnum, batch_size=args.batch_size, maxlen=args.maxlen, n_workers=3)
     model = SASRec(usernum, itemnum, args).to(args.device) # no ReLU activation in original SASRec implementation?
@@ -92,7 +93,7 @@ if __name__ == '__main__':
     if args.inference_only:
         model.eval()
         t_test = evaluate(model, dataset, args)
-        print('test (NDCG@10: %.4f, HR@10: %.4f)' % (t_test[0], t_test[1]))
+        print('test (NDCG@10: %.4f, Recall@10: %.4f)' % (t_test[0], t_test[1]))
     
     # ce_criterion = torch.nn.CrossEntropyLoss()
     # https://github.com/NVIDIA/pix2pixHD/issues/9 how could an old bug appear again...
@@ -132,7 +133,7 @@ if __name__ == '__main__':
             print('Evaluating', end='')
             t_test = evaluate(model, dataset, args)
             t_valid = evaluate_valid(model, dataset, args)
-            print('epoch:%d, time: %f(s), valid (NDCG@10: %.4f, HR@10: %.4f), test (NDCG@10: %.4f, HR@10: %.4f)'
+            print('epoch:%d, time: %f(s), valid (NDCG@10: %.4f, Recall@10: %.4f), test (NDCG@10: %.4f, Recall@10: %.4f)'
                     % (epoch, T, t_valid[0], t_valid[1], t_test[0], t_test[1]))
 
             if t_valid[0] > best_val_ndcg or t_valid[1] > best_val_hr or t_test[0] > best_test_ndcg or t_test[1] > best_test_hr:

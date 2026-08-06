@@ -130,7 +130,7 @@ def evaluate(model, dataset, args):
     [train, valid, test, usernum, itemnum] = copy.deepcopy(dataset)
 
     NDCG = 0.0
-    HT = 0.0
+    HT = 0.0  # Hit Rate@10。注意：本协议每用户 1 个 ground-truth，HR@10 ≡ Recall@10（数值等价）
     valid_user = 0.0
 
     if usernum>10000:
@@ -180,7 +180,7 @@ def evaluate_valid(model, dataset, args):
 
     NDCG = 0.0
     valid_user = 0.0
-    HT = 0.0
+    HT = 0.0  # Hit Rate@10 ≡ Recall@10（1-positive 协议下数值等价）
     if usernum>10000:
         users = random.sample(range(1, usernum + 1), 10000)
     else:

@@ -234,9 +234,9 @@ bce_criterion = torch.nn.BCEWithLogitsLoss()
 1. 观察不同 `num_blocks` 和 `num_heads` 对性能的影响
 2. 调整 `maxlen`，看看序列长度是否影响效果
 3. 对比 `cuda` 和 `cpu` 的训练速度
-4. 结合实际推荐指标（HR、NDCG）分析结果
-5. 尝试本项目新增的量子启发扩展：`--variant state / dynamic`（见 §10），研究密度状态表示与动态演化的效果
-6. 配合研究文档 `docs/02_research_log.md`，跟踪 RQ1/RQ2/RQ3 的验证进度
+4. 结合实际推荐指标（R@10、NDCG@10）分析结果（本协议下 HR@10 ≡ Recall@10，统一报 R@10）
+5. 尝试本项目的新增 variant：`--variant state / dynamic / density_feature / vector_evolve`（见 §10），研究密度状态表示与动态演化的效果
+6. 配合研究文档 `docs/02_research_log.md`，跟踪 RQ1-RQ4 的验证进度
 
 ---
 
@@ -246,17 +246,19 @@ SASRec 的本质是：用自注意力机制建模用户历史行为序列中的�
 
 ---
 
-## 10. 附录：量子启发扩展（state / dynamic variant）代码解析
+## 10. 附录：Density State 扩展（state / dynamic variant）代码解析
 
-> 本附录与 `docs/02_research_log.md` §4（理论笔记）配套，解释代码层面的实现。核心思想：把"最后一个向量 $h_t$"升级为"密度状态 $\rho_t$"并支持时序演化。
+> 本附录与 `docs/02_research_log.md` §4（理论笔记）配套，解释代码层面的实现。核心思想：把"最后一个向量 $h_t$"升级为"密度状态 $\rho_t$"并支持时序演化。主线体系见 `docs/05_experiment_plan.md` §0（M0-M4）。
 
-### 10.1 三种 variant
+### 10.1 五种 variant（M0-M4 映射）
 
-| variant | 说明 | 打分 |
-|---|---|---|
-| `vector`（默认） | 原始 SASRec，兴趣为向量 $h_t$ | dot product（无界） |
-| `state` | 兴趣为密度状态 $\rho$，只用最后一步 $\rho_T$ | $\mathrm{Tr}(\rho_T\rho_i)\in[0,1]$ |
-| `dynamic` | 在 `state` 基础上沿时间步做凸组合演化 | 同上 |
+| variant | M 编号 | 说明 | 打分 |
+|---|---|---|---|
+| `vector`（默认） | M0 SASRec | 原始 SASRec，兴趣为向量 $h_t$ | dot product（无界） |
+| `density_feature` | M1 DF | DMPEN 式：item 提升为密度特征再进编码器 | dot product |
+| `state` | M2 DS | 兴趣为密度状态 $\rho$，只用最后一步 $\rho_T$ | $\mathrm{Tr}(\rho_T\rho_i)$ → logit |
+| `dynamic` | M3 DDS | 在 `state` 基础上沿时间步做凸组合演化 | 同上 |
+| `vector_evolve` | VE（对照） | 对编码器输出沿时间做向量 EMA | dot product |
 
 ### 10.2 `StateProjection`：向量 → 密度状态
 
@@ -292,18 +294,23 @@ class StateTransition(torch.nn.Module):
 - 数学：$\rho_{t+1}=\alpha\rho_t+(1-\alpha)\rho_{i_t}$，凸组合保证中间状态始终是合法密度矩阵（PSD + trace 保持）。
 - `--transition fixed`：$\alpha$ 固定标量；`--transition learnable`：$\alpha$ 为全局可学习标量（sigmoid 保证在 $[0,1]$）。
 
-### 10.4 训练 / 推理打分
+### 10.4 训练 / 推理打分（`--matching trace | dot`）
 
-- 训练：`pos_logits = (rho_seq * rho_pos).sum(dim=(-1,-2))`，即 $\mathrm{Tr}(\rho_{t}\,\rho_{pos})$；负样本同理。
-- 推理：`rho_user = rho_seq[:, -1]`（取最后一步状态），`logits = (rho_user * rho_item).sum(dim=(-1,-2))`。
+- 默认 `--matching trace`：训练 `pos_logits = (rho_seq * rho_pos).sum(dim=(-1,-2))`，即 $\mathrm{Tr}(\rho_{t}\,\rho_{pos})$；负样本同理。推理 `rho_user = rho_seq[:, -1]`（取最后一步状态）。打分经 `_logit_score`（logit 变换）映射到无界 logits。
+- `--matching dot`（RQ3 匹配消融）：用密度状态的一阶方向向量 `state_proj.direction(h)` 做 dot product（`dynamic` 时对方向做向量 EMA），对照"一阶相似度 vs 二阶相似度"。
+- RQ4 不确定性：`SASRec.state_entropy(rho)` 计算 von Neumann 熵 $H(\rho)=-\mathrm{Tr}(\rho\log\rho)$。
 
 ### 10.5 运行示例（uv）
 
 ```bash
-# 静态密度状态（RQ1）
+# 静态密度状态（RQ1，M2 DS）
 uv run main.py --dataset ml-1m --train_dir quant_state --variant state --state_rank 1 --device cpu
-# 动态演化（RQ2 核心）
+# 动态演化（RQ2 核心，M3 DDS）
 uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --state_rank 1 --transition learnable --device cpu
+# RQ3 匹配消融：DDS 用一阶方向 dot 对照 trace
+uv run main.py --dataset ml-1m --train_dir quant_dds_dot --variant dynamic --state_rank 1 --matching dot --device cpu
+# VE 对照（向量 EMA）
+uv run main.py --dataset ml-1m --train_dir quant_ve --variant vector_evolve --device cpu
 ```
 
-> ⚠️ 已知问题（见 `docs/02_research_log.md` §4.4）：$\mathrm{Tr}$ 打分被压到 $[0,1]$，与 `BCEWithLogitsLoss` 不匹配，当前结果不代表最终效果，需先修正打分/损失再下结论。
+> ✅ 已知问题（Tr/BCE 不匹配）已于 2026-08-03 修复：`Tr` 打分经 logit 变换兼容 `BCEWithLogitsLoss`；主损失默认 **BPR**（见 `docs/02_research_log.md` §4.4）。
