@@ -64,6 +64,29 @@ $$\rho_t=\alpha\,\rho_{t-1}+(1-\alpha)\,\hat\rho_t,\qquad t=1,\dots,T$$
 $$s(u,i)=\mathrm{Tr}(\rho_u\,\rho_i)$$
 - 本质是 $\mathbb{R}^{d\times d}$ 上的 HS 内积 $\langle A,B\rangle=\mathrm{Tr}(A^\top B)$（实对称情形，$A^\dagger=A^\top$），即 **operator-level similarity kernel**。
 
+### 5.1 高效实现：Low-rank Operator Matching（2026-08-06 落地）
+
+**动机**：显式构造 $\rho\in\mathbb{R}^{d\times d}$ 再算 $\mathrm{Tr}(\rho_u\rho_i)$ 的复杂度/内存为 $O(d^2)$；利用 rank-$r$ 因子 $L$ 可降至 $O(d r^2)$ / $O(d r)$。
+
+**定义（论文约定）**：$\rho=\frac{LL^\top}{\|L\|_F^2}$，$L\in\mathbb{R}^{d\times r}$（实现取转置 $M=L^\top\in\mathbb{R}^{r\times d}$、$\rho=M^\top M/\|M\|_F^2$，数学等价）。
+
+**Matching 恒等式（等价性）**：
+$$\mathrm{Tr}(\rho_u\rho_i)=\frac{\mathrm{Tr}(L_uL_u^\top L_iL_i^\top)}{\|L_u\|_F^2\|L_i\|_F^2}=\frac{\|L_u^\top L_i\|_F^2}{\|L_u\|_F^2\,\|L_i\|_F^2}$$
+（迹循环性质：$\|L_u^\top L_i\|_F^2=\mathrm{Tr}(L_i^\top L_uL_u^\top L_i)$。）
+
+**复杂度（精确）**：
+| Operation | Full density | Low-rank |
+|---|---|---|
+| Construct state（$\rho$ 或 $L$） | $O(d^2 r)$ | $O(d^2 r)$ |
+| Matching $s(u,i)$ | $O(d^2)$ | $O(d r^2)$ |
+| Memory | $O(d^2)$ | $O(d r)$ |
+
+**实现**：`StateProjection.lowrank()` 返回 $(L,\|L\|_F^2)$；`_hs_lowrank`（静态：$\|L_u L_i^\top\|_F^2$，转置约定）与 `_hs_mixed`（演化后混合态 $\rho_u$ 对 item 低秩 $L_i$：$\mathrm{Tr}(L_i^\top\rho_u L_i)/\|L_i\|_F^2$）。state 变体**完全低秩**（不构造 $\rho$）；dynamic 变体**精确演化需 operator-space 凸组合**（保持合法性），故演化仍构造 $\rho$、打分用低秩。
+
+**等价验证**：`test_smoke.py` 断言 $\max|s_{\mathrm{matrix}}-s_{\mathrm{lowrank}}|<10^{-4}$（多 batch/rank/seed，state 与 dynamic 均覆盖）。
+
+**工程价值（可写进论文）**：*Although density states are mathematically defined in operator space, we exploit low-rank factorization to compute Hilbert–Schmidt similarity without explicit matrix construction* —— 直接回应 $O(d^2)$ 扩展性质疑。
+
 ---
 
 ## 6. 训练目标（Loss）

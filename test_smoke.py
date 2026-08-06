@@ -102,6 +102,45 @@ def run_variant(variant, rank=1, matching="trace"):
     print("    [OK] backward: {} grads computed, loss={:.4f}".format(sum(grads), loss.item()))
 
 
+def check_lowrank_equiv_robust():
+    """多 batch/rank/seed 下验证 low-rank 打分 ≡ 显式 matrix 打分（state 与 dynamic）。"""
+    print("\n=== low-rank vs matrix equivalence (robust) ===")
+    worst_state, worst_dyn = 0.0, 0.0
+    for seed in (0, 1, 2):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        for rank in (1, 2, 4):
+            for B in (2, 8):
+                T = 6
+                log_seqs = torch.randint(1, 51, (B, T)).numpy()
+                pos_seqs = torch.randint(1, 51, (B, T)).numpy()
+
+                # state：_hs_lowrank vs 显式 rho 逐元素
+                model = SASRec(user_num=100, item_num=50, args=make_args("state", rank))
+                log_feats = model.log2feats(log_seqs)
+                L_u, n_u = model.state_proj.lowrank(log_feats)
+                L_i, n_i = model.state_proj.lowrank(model.item_emb(torch.LongTensor(pos_seqs)))
+                s_low = model._hs_lowrank(L_u, n_u, L_i, n_i)
+                s_mat = (model.state_proj(log_feats) * model.state_proj(model.item_emb(torch.LongTensor(pos_seqs)))).sum(dim=(-1, -2))
+                err_s = (s_low - s_mat).abs().max().item()
+                worst_state = max(worst_state, err_s)
+                assert err_s < 1e-4, "state lowrank!=matrix err={}".format(err_s)
+
+                # dynamic：_hs_mixed（演化后 rho vs item 低秩） vs 显式 rho*rho
+                model2 = SASRec(user_num=100, item_num=50, args=make_args("dynamic", rank))
+                log_feats2 = model2.log2feats(log_seqs)
+                rho_seq = model2._to_state_sequence(log_feats2)
+                L_pos, n_pos = model2.state_proj.lowrank(model2.item_emb(torch.LongTensor(pos_seqs)))
+                s_mixed = model2._hs_mixed(rho_seq, L_pos, n_pos)
+                s_mat2 = (rho_seq * model2.state_proj(model2.item_emb(torch.LongTensor(pos_seqs)))).sum(dim=(-1, -2))
+                err_m = (s_mixed - s_mat2).abs().max().item()
+                worst_dyn = max(worst_dyn, err_m)
+                assert err_m < 1e-4, "dynamic mixed!=matrix err={}".format(err_m)
+
+                print("    [OK] seed={} rank={} B={}: state_err={:.1e} dyn_err={:.1e}".format(seed, rank, B, err_s, err_m))
+    print("    [OK] low-rank == matrix (worst: state={:.1e}, dynamic={:.1e})".format(worst_state, worst_dyn))
+
+
 if __name__ == "__main__":
     for v in ("vector", "state", "dynamic", "vector_evolve", "density_feature"):
         run_variant(v)
@@ -109,4 +148,6 @@ if __name__ == "__main__":
     # RQ3：dot matching（一阶方向 dot）在 state/dynamic 下也应通过
     for v in ("state", "dynamic"):
         run_variant(v, matching="dot")
+    # 稳健等价性：不同 batch/rank/seed 下 low-rank == 显式 matrix（state 与 dynamic）
+    check_lowrank_equiv_robust()
     print("\nALL SMOKE TESTS PASSED")

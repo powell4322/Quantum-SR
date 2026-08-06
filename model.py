@@ -272,8 +272,8 @@ class SASRec(torch.nn.Module):
         if self.variant in ('state', 'dynamic'):
             if self.matching == 'trace':
                 if self.variant == 'dynamic':
-                    # 演化必须在 rho（C×C）层做（凸组合保持合法性）——这是唯一必须构造 C×C 的地方；
-                    # 打分用低秩（item 侧 L，O(C r^2)），避免 rho*rho 的 O(C^2) 逐元素乘。
+                    # 精确演化需在 operator space（C×C）做凸组合以保持合法性；打分用低秩（item 侧 L，O(C r^2)）。
+                    # factor-space 演化（rank truncation / low-rank update）是 future approximation，不改第一版语义。
                     rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
                     L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
                     L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))

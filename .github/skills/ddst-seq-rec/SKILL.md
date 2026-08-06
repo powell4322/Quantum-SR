@@ -27,6 +27,7 @@ $\rho_t \in \mathcal{D}_d = \{\rho:\rho=\rho^\top,\ \rho\succeq0,\ \mathrm{Tr}(\
 - **主损失 = BPR**（默认）：$\mathcal{L}=-\sum\log\sigma(s^+-s^-)$；**BCE 仅作 ablation**（Tr 经 logit 变换后兼容 `BCEWithLogitsLoss`）。
 - ✅ Tr/BCE 不匹配已修复（2026-08-03）：logit 变换 + 默认 BPR。
 - 指标统一 **R@10 / NDCG@10**（本协议下 HR@10 ≡ Recall@10，数值等价）。
+- **低秩打分（工程）**：$\mathrm{Tr}(\rho_u\rho_i)=\|L_u^\top L_i\|_F^2/(\|L_u\|_F^2\|L_i\|_F^2)$（与显式矩阵完全等价，$O(d r^2)$ vs $O(d^2)$）；`StateProjection.lowrank` / `_hs_lowrank` / `_hs_mixed` 实现（见 `docs/09_theory_v1.md` §5.1）。
 
 ## 与已有工作边界
 - WWW 2026 quantum CF：$\rho_u$ 静态 → 我们随序列时间维演化 $\rho_1\to\rho_T$。

@@ -136,7 +136,22 @@ $$\rho_{t+1}=\alpha_t\,\rho_t+(1-\alpha_t)\,\rho_{i_t},\qquad 0\le\alpha_t\le 1$
 
 **结论**：打分/损失已修正，可进入正式实验（GPU）。
 
-### 4.5 理论清单（开放问题）
+### 4.5 运行效率：Low-rank Operator Matching（2026-08-06 落地）
+
+**公式（与显式矩阵完全等价）**：$\rho=LL^\top/\|L\|_F^2$（$L\in\mathbb{R}^{d\times r}$；实现取转置约定 $L\in\mathbb{R}^{r\times d}$、$\rho=L^\top L/\|L\|_F^2$），
+$$\mathrm{Tr}(\rho_u\rho_i)=\frac{\|L_u^\top L_i\|_F^2}{\|L_u\|_F^2\,\|L_i\|_F^2}$$
+
+**复杂度（精确）**：Construct state 满秩/低秩均 $O(d^2 r)$；Matching $O(d^2)\to O(d r^2)$；Memory $O(d^2)\to O(d r)$。
+
+**实现**：`StateProjection.lowrank()` 返回 $(L,\|L\|_F^2)$；`_hs_lowrank`（静态）与 `_hs_mixed`（演化后混合态对 item 低秩）打分；state 完全低秩（不构造 $\rho$），dynamic 仅演化时构造 $\rho$。
+
+**等价验证**：`test_smoke.py` 断言 $\max|s_{matrix}-s_{lowrank}|<10^{-4}$（多 batch/rank/seed，state 与 dynamic 均覆盖）。
+
+**待办 / 未来**：
+- [ ] **item 侧 $L_i$ 预计算缓存**（$L_i=\mathrm{Proj}(e_i)$ 对所有 item，存 $I\times r\times d$，ml-1m 约 ~2MB）——训练/评估避免重复投影；eval 前需按当前 `item_emb` 刷新缓存。
+- [ ] **factor-space 演化近似**：$\rho_t=\alpha\rho_{t-1}+(1-\alpha)\hat\rho_t$ 可写为 $[\sqrt{\alpha/Z_{t-1}}L_{t-1},\sqrt{(1-\alpha)/Z_t}L_t]AA^\top$ 形式，但 rank 随 $T$ 增长 → 需 rank truncation（SVD）或 fixed-rank update；第一版保留 operator-space 精确演化（*exact density evolution requires operator-space transition; low-rank factorization can further approximate this transition*）。
+
+### 4.6 理论清单（开放问题）
 
 - [ ] 可学习/自适应 $\alpha_t$ 是否坍缩到 0/1？梯度稳定性如何？
 - [ ] 低秩 $r$ 与表达能力/参数量/过拟合的权衡（对应 A-1 维度效率实验）。
