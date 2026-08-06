@@ -1,0 +1,8 @@
+# 运行时依赖（无 uv 的服务器用 pip 安装：pip install -r requirements.txt）
+# 与 pyproject.toml 保持一致。
+#
+# ⚠️ GPU 服务器注意：先按 nvidia-smi 的 CUDA 版本装 cu 版 torch，再装其余依赖：
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+numpy>=2.5.1
+torch>=2.13.0

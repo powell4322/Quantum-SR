@@ -1,7 +1,7 @@
 # 服务器一键运行（SERVER_RUN）
 
-> 目标：在 GPU 服务器上 **一条命令** 完成 —— 拉取仓库 → 建环境装包 → 放数据 → 跑完 DDST 主实验（四阶递进 **V < DF < DS < DDS** + VE 对照）。
-> 配套：`05_experiment_plan.md`（实验设计）、`06_usage_sasrec.md`（参数说明）。
+> 目标：在 GPU 服务器上 **一条命令** 完成 —— 拉取仓库 → 建环境装包 → 放数据 → 冒烟；**实验按 §2 清单顺序执行**（主实验 → 消融 → 分析）。
+> 配套：`05_experiment_plan.md`（实验设计）、`06_usage_sasrec.md`（参数说明）、`requirements.txt`（pip 依赖，无 uv 服务器用）。
 
 ---
 
@@ -19,13 +19,13 @@ set -e
 git clone https://github.com/powell4322/Quantum-SR.git
 cd Quantum-SR
 
-# ---------- 2) 建虚拟环境 + 安装依赖 ----------
+# ---------- 2) 建虚拟环境 + 安装依赖（无 uv，用 requirements.txt） ----------
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install numpy
-# 按 nvidia-smi 的 CUDA 版本选择 cu 后缀（cu118 / cu121 / cu124 ...）
+# ⚠️ 先按 nvidia-smi 的 CUDA 版本装 cu 版 torch（cu118 / cu121 / cu124 ...），再装其余依赖
 pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements.txt
 
 # ---------- 3) 放置数据（数据不入库，需自行上传） ----------
 # 把三个数据集文件 ml-1m.txt / Beauty.txt / Steam.txt 放到 data/ 下（每行: user item，空格分隔，从 1 编号）
@@ -35,34 +35,45 @@ mkdir -p data
 # ---------- 4) 冒烟自检（可选但建议） ----------
 python test_smoke.py
 
-# ---------- 5) 跑主实验（ml-1m，四阶递进 + VE 对照） ----------
+# ---------- 5) 跑主实验 ml-1m（= §2 Step 1；完整顺序见 §2） ----------
 python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
     --variants vector density_feature state dynamic vector_evolve --state_rank 1 --tag main
 ```
 
-## 2. 三个数据集都跑
+## 2. 实验清单与先后顺序（按此执行）
 
+> 原则：**先用 ml-1m 快速验证趋势，再跑 Beauty / Steam**；**先主实验（回答 RQ1/RQ2），再消融（RQ3），最后离线分析（RQ4）**。每个 Step 产出回填 `02_research_log.md` §6。
+
+### Step 1 — 主实验 · ml-1m（先验证四阶递进趋势）
+验证目标：**V < DF < DS < DDS**（RQ1/RQ2），且 **DDS − DS 增益 ≠ VE 的 EMA 增益**。
 ```bash
-source .venv/bin/activate
-cd Quantum-SR   # 如不在仓库根目录
+source .venv/bin/activate && cd Quantum-SR
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants vector density_feature state dynamic vector_evolve --state_rank 1 --tag main
+```
+> ⚠️ 若 ml-1m 趋势不成立：先停，检查 `02_research_log.md` §4.4/§4.5 已知问题，**不要直接跑大数据集**。
 
-for ds in ml-1m Beauty Steam; do
+### Step 2 — 主实验 · Beauty / Steam（稀疏 / 长尾验证）
+```bash
+for ds in Beauty Steam; do
   python run_experiments.py --dataset $ds --epochs 200 --device cuda --loss bpr \
       --variants vector density_feature state dynamic vector_evolve --state_rank 1 --tag main
 done
 ```
 
-## 3. 消融实验
-
+### Step 3 — RQ3 匹配消融（ml-1m，同状态下 dot vs Tr）
 ```bash
-source .venv/bin/activate
-
-# RQ3：matching 消融 —— DDS 用 dot（一阶方向）对照 trace（二阶 HS）
 python main.py --dataset ml-1m --train_dir rq3_ds_dot  --variant state   --matching dot --device cuda --loss bpr --num_epochs 200
 python main.py --dataset ml-1m --train_dir rq3_dds_dot --variant dynamic --matching dot --device cuda --loss bpr --num_epochs 200
-
-# E003：ρ0 初始化消融（I/d 为当前默认；First observation / Learnable 后续代码扩展后补跑）
 ```
+
+### Step 4 — E003 ρ0 初始化消融（I/d / First observation / Learnable）
+> 当前代码默认 I/d；First observation / Learnable 需代码扩展后补跑（见 `02_research_log.md` §4.5 待办）。
+
+### Step 5 — RQ4 entropy 分析（离线，用已训练 DDS 权重）
+> 用 `SASRec.state_entropy` 对测试用户按 $H(\rho_u)$ 分低/中/高组，比较各组 DDS vs V 的增益。脚本在结果回填阶段补写。
+
+---
 
 ## 4. 结果产物
 - 主实验汇总 → `results/exp_main.csv`（列：`variant,ndcg10,recall10,last_loss`）
