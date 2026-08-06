@@ -1,4 +1,6 @@
-# 量子启发序列推荐 · 研究追踪日志（Research Log）
+# Dynamic Density State Transformer (DDST) · 研究追踪日志（Research Log）
+
+> 📌 **定位唯一 source of truth = `docs/09_research_positioning_v2.md`（DDST，2026-08-06 冻结）**。SASRec 为唯一 backbone，其他模型仅作递进消融；quantum 仅作工具来源说明。本文件历史记录如与 v2 冲突，以 v2 为准。
 
 > 本文档用于**持续追踪研究方向**：记录哪些 idea 被验证/舍弃、当前理论状态、实验进度与结论。
 > 每次有新想法、新实验结果或代码改动，请在本文件对应章节追加记录（保留历史，不要删除旧结论）。
@@ -139,7 +141,7 @@ $$\rho_{t+1}=\alpha_t\,\rho_t+(1-\alpha_t)\,\rho_{i_t},\qquad 0\le\alpha_t\le 1$
 - [ ] 可学习/自适应 $\alpha_t$ 是否坍缩到 0/1？梯度稳定性如何？
 - [ ] 低秩 $r$ 与表达能力/参数量/过拟合的权衡（对应 A-1 维度效率实验）。
 - [ ] trace 打分是否需要 logit 变换才能与 BCE 兼容（§4.4 决策）。
-- [ ] "Quantum" 命名合理性辩护：正文讲 density-state / quantum-inspired，标题是否保留 quantum 待定。
+- [x] "Quantum" 命名：已定（2026-08-06 v2）——标题/正文不含 quantum，统一 DDST / operator-level 表述。
 - [ ] 纯态近似下 $Tr=(u\cdot i)^2$ 与平方余弦的数值等价性验证（作为"state ⊇ vector"证据）。
 
 ---

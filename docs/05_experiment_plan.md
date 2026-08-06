@@ -7,6 +7,8 @@
 
 ## 0. 冻结路线（2026-08-06）
 
+> 📌 **唯一 source of truth = `09_research_positioning_v2.md`（DDST）**。
+
 **第一篇论文 = DDST**：vector hidden state → **density operator state**（不确定性/多兴趣表示）+ **legality-preserving dynamic evolution**（凸组合）+ **operator-level similarity**（Tr）。
 
 - **不做**：QDM-Former / 量子纠缠 / CNOT / Angle Embedding / Measurement 作为主线（计算不可扩展、理论优势不可证、易被判 quantum overclaim）。

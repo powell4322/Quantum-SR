@@ -1,6 +1,6 @@
 ---
 name: research-experiment
-description: 'Run and log SASRec multi-variant experiments (vector/state/dynamic) for this quantum-inspired sequential recommendation project. Use when running experiments, comparing variants, parsing metrics, filling RESEARCH_LOG section 6, preparing GPU-server runs, choosing hyperparameters, or ensuring fair same-hyperparameter comparisons. Covers run_experiments.py usage, --eval_every, metric parsing, and the strict logging protocol.'
+description: 'Run and log SASRec multi-variant experiments (vector/state/dynamic/density_feature/vector_evolve) for the DDST (Dynamic Density State Transformer) project. Use when running experiments, comparing variants, parsing metrics (R@10/NDCG@10), filling RESEARCH_LOG section 6, preparing GPU-server runs, choosing hyperparameters, or ensuring fair same-hyperparameter comparisons. Covers run_experiments.py usage, --eval_every, --matching, metric parsing, and the strict logging protocol.'
 user-invocable: true
 ---
 
@@ -11,12 +11,17 @@ user-invocable: true
 - PATH 里的 `python` 是 WindowsApps 占位符，**不可用**。
 - 服务器 GPU：按 CUDA 版本装 GPU 版 torch（见"GPU 服务器"）。
 
-## 三个方案（variant）
-| variant | 表示 | 演化 | 打分 | 回答 RQ |
-|---|---|---|---|---|
-| `vector` | $h_t$ | 无 | dot | 基线 |
-| `state` | $\rho_t$ | 无 | $\mathrm{Tr}$ | RQ1/RQ2 |
-| `dynamic` | $\rho_t$ | 凸组合 | $\mathrm{Tr}$ | RQ3（核心） |
+## 五个方案（variant，M0-M4 映射见 docs/05_experiment_plan.md §0）
+| variant | M | 表示 | 演化 | 打分 | 回答 RQ |
+|---|---|---|---|---|---|
+| `vector` | M0 | $h_t$ | 无 | dot | 基线 |
+| `density_feature` | M1 | $ee^\top$（feature） | 无 | dot | 二阶表示 |
+| `state` | M2 | $\rho_t$ | 无 | $\mathrm{Tr}$（`--matching trace`） | RQ1/RQ3 |
+| `dynamic` | M3 | $\rho_t$ | 凸组合 | $\mathrm{Tr}$（`--matching trace`） | RQ2/RQ3（核心） |
+| `vector_evolve` | VE | $h_t$ | 向量 EMA | dot | EMA 对照 |
+
+- `--matching dot`：state/dynamic 用一阶方向 dot（RQ3 匹配消融）。
+- 指标统一 **R@10 / NDCG@10**（本协议下 HR@10 ≡ Recall@10）。
 
 ## 跑实验
 ```bash
@@ -49,5 +54,6 @@ user-invocable: true
 改 `model.py` 后必跑：`.venv\Scripts\python.exe test_smoke.py`（校验三种 variant 与密度矩阵合法性 PSD+trace=1）。
 
 ## 已知注意事项
-- Tr 打分与 BCE 不匹配问题见 `quantum-seq-rec` skill 与 `docs/02_research_log.md` §4.4——正式实验前需确认是否已采用修正方案。
+- Tr 打分与 BCE 不匹配问题见 `docs/02_research_log.md` §4.4——已于 2026-08-03 修复（logit 变换 + 默认 BPR；Tr 经 `_logit_score` 映射）。
+- 领域知识/定位见 `ddst-seq-rec` skill 与 `docs/09_research_positioning_v2.md`。
 - 修正打分/损失时优先做成可切换参数，避免为每个方案维护独立代码。

@@ -1,6 +1,7 @@
-# 量子启发序列推荐 · 论文理论支撑（Theory & Formulation）
+# Dynamic Density State Transformer (DDST) · 论文理论支撑（Theory & Formulation）
 
-> 本文档为论文提供**严格的数学表述与理论论证**，并把"量子信息概念"与"推荐算法设计"一一对应，防止审稿人质疑"只是借用名词"。
+> 📌 定位唯一 source of truth = `09_research_positioning_v2.md`（DDST，2026-08-06 冻结）。本文档提供严格数学表述与理论论证；density-operator（量子）概念仅作**工具/来源说明**，论文正文用 **operator-level** 表述。
+> 本文档为论文提供**严格的数学表述与理论论证**，并把"density-operator 概念"与"推荐算法设计"一一对应，防止审稿人质疑"只是借用名词"。
 > 状态：持续更新；每个理论条目应逐步被实验（见 `docs/02_research_log.md` §6）佐证或修正。
 
 ---

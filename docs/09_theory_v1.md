@@ -1,5 +1,7 @@
 # 理论定稿 v1（THEORY_V1）：Dynamic Preference Density State Model
 
+> 📌 **定位唯一 source of truth = `09_research_positioning_v2.md`（DDST，2026-08-06 冻结）**。本文档提供理论细节（命题/证明），与 v2 一致；如冲突以 v2 为准。
+
 > **本文档是统一、严谨的理论基础**（2026-08-03 定稿）。解决 `08_math_checklist.md` 中的 F1/F2 不一致；**所有公式、命题、猜想以此为准**。修改代码/写论文前先参照本文件。
 > 配套：`08_math_checklist.md`（逐条核查）、`03_theory.md`（理论支撑过程版，后续精简并指向本文）。
 

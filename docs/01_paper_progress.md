@@ -7,6 +7,8 @@
 
 ## 1. Research Start（研究起点 & 投稿定位）
 
+> 📌 **定位唯一 source of truth = `09_research_positioning_v2.md`（2026-08-06 冻结，DDST）**。本文档 §1/§2 与 v2 一致；如冲突以 v2 为准。
+
 ### 1.1 一句话起点（研究声明 · 英文定稿）
 > Sequential recommendation models user interests as hidden vectors $h_t=f(S_{\le t})$. However, user preference evolution has two characteristics: **uncertainty** and **gradual transition**. Existing methods (SASRec/BERT4Rec: point/contextual vectors; MIND: multiple but independent vectors; DMPEN: density as **feature** with RNN evolution) lack **a mathematically constrained evolving preference state**. We formulate user preference as a **dynamic density state** $\rho_t$ (PSD, trace=1) that evolves via a **legality-preserving convex transition**, and score next items by **Hilbert–Schmidt similarity**.
 > ⚠️ 定位（2026-08-03 定稿）：创新主体 = **dynamic legality-preserving density state evolution**；**不做"首次 density"claim**（DMPEN 已做 density+sequential）；quantum 仅作来源说明，正文用 **operator-level** 表述。
@@ -180,7 +182,7 @@
 | `docs/06_usage_sasrec.md` | 代码使用说明 | ✅ **保留**（英文名，已决定；中文名文档已删除） |
 | `docs/04_related_work.md` | 相关工作总结 + 防撞对照表（quantum rec / uncertainty rec / distributional rec） | ✅ **新增**（采纳 GPT：防止撞 idea） |
 | `docs/05_experiment_plan.md` | 实验矩阵（数据集、baseline、主/消融/分析） | ✅ **新增**（采纳 GPT：所有实验矩阵集中管理） |
-| `.github/skills/*` | 研究 skill | ✅ 保留（需同步 quantum-seq-rec 的"rank>1 多兴趣"措辞） |
+| `.github/skills/*` | 研究 skill | ✅ 已更新（quantum-seq-rec → ddst-seq-rec，对齐 DDST 定位） |
 
 **职责划分原则**：RESEARCH_LOG = 研究过程（是什么/发生了什么）；THEORY = 理论为什么成立；PAPER_PROGRESS = 论文怎么组织+审核入口；使用说明 = 给代码使用者。避免同一内容出现在两处。
 

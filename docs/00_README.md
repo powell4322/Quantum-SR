@@ -13,6 +13,7 @@
 | `04_related_work.md` | **相关工作 / 防撞**：三方向对照 + 关键先例（🔴 DASFAA 2019 待精读） | 投稿前防撞、写 Related Works |
 | `05_experiment_plan.md` | **实验计划**：数据集 / baseline / 实验设计矩阵 / 运行命令 / 铁律 | 规划、跑实验 |
 | `06_usage_sasrec.md` | **代码使用说明**（怎么跑、参数） | 使用者 / 排查代码 |
+| `09_research_positioning_v2.md` | **研究定位 v2（唯一 Source of Truth，DDST）** | 定位/写论文先看 |
 | `09_theory_v1.md` | **理论定稿 v1**（P1-P5 命题 + 证明、合法性演化、熵） | 写 Method / 理论论证 |
 | `10_server_run.md` | **服务器一键运行**（git + 装包 + 跑实验） | 上 GPU 服务器时 |
 
@@ -27,7 +28,7 @@
 
 ## ⚠️ 当前最重要的事（2026-08-06）
 
-**路线冻结：第一篇论文 = Dynamic Density State Transformer (DDST)。** 主线 = density operator state（M2 DS）+ legality-preserving evolution（M3 DDS）+ operator similarity（Tr）；不做 QDM-Former/量子纠缠主线。数据集定为 ml-1m / Beauty / Steam；指标统一 **R@10 / NDCG@10**（本协议下 HR@10 ≡ Recall@10）。详见 `05_experiment_plan.md` §0 与 `10_server_run.md`。
+**研究定位唯一 source of truth = `09_research_positioning_v2.md`（DDST）。** 主线 = density operator state（M2 DS）+ legality-preserving evolution（M3 DDST）+ operator similarity（Tr）；**删除 Quantum / Entanglement / Fidelity 主线，不再用 QDM-Former 作为核心**；SASRec 为唯一 backbone；数据集 ml-1m / Beauty / Steam；指标统一 **R@10 / NDCG@10**。详见 v2 与 `05_experiment_plan.md` §0、`10_server_run.md`。
 
 > 注意：`.github/skills/` 下另有给 Copilot 自动加载的 skill（领域知识、实验协议），非人读文档，无需进本目录。
 
