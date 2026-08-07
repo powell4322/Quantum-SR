@@ -52,7 +52,19 @@ conda activate ddsr && cd Quantum-SR
 python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
     --variants vector density_feature state dynamic vector_evolve --state_rank 1 --tag main
 ```
-> ⚠️ 若 ml-1m 趋势不成立：先停，检查 `02_research_log.md` §4.4/§4.5 已知问题，**不要直接跑大数据集**。
+> ⚠️ 若 ml-1m 趋势不成立：先停，检查 `02_research_log.md` §6.1 诊断（Tr 打分压缩主因）与 §4.4/§4.5，**不要直接跑大数据集**。
+
+### Step 1.5 — Phase 1 Rank Ablation（ml-1m，最高优先级，`agent/research_plan.md` §5 Phase 1）
+验证：rank 是否把 DS / DDS 拉回 V 之上（**Case A**：rank8>rank1 → mixed state 有效；**Case B**：rank 无改善 → 需重新设计打分）。
+```bash
+# Static：rank=1/4/8/16
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants state --state_rank 1 4 8 16 --tag rank
+# Dynamic：rank=4/8/16（rank=1 已有 E001）
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants dynamic --state_rank 4 8 16 --tag rank
+```
+> 预判（`research_log` §6.1）：瓶颈在打分尺度而非秩，rank 提升可能有限（Case B 风险）；跑完对照诊断决定是否进 Phase 3（confidence-aware scoring）。
 
 ### Step 2 — 主实验 · Beauty / Steam（稀疏 / 长尾验证）
 ```bash

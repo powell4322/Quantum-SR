@@ -237,16 +237,32 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 
 > ⚠️ **可读性提示**：E000 三行为 quick sanity check（5 轮、CPU、小超参），受 §4.4 的 Tr/BCE 不匹配影响，**不代表** idea 无效；其原始输出文件（`ml-1m_quant_*_quick/`、`results/exp_quick.csv`）已清理（2026-08-03）。正式结论以修正打分/损失后的 E001+ 为准。
 
-| 实验ID | 日期 | variant | state_rank | 其它配置 | NDCG@10 | HR@10 | 相对 baseline | 结论 / 下一步 |
+| 实验ID | 日期 | variant | state_rank | 其它配置 | NDCG@10 | R@10 | 相对 baseline | 结论 / 下一步 |
 |---|---|---|---|---|---|---|---|---|
 | E000 | 2026-08-02 | vector | - | quick: maxlen=50,hidden=32,blocks=1,epochs=5,CPU | 0.3030 | 0.5394 | 1.00x | 仅 sanity check；loss=0.91 |
 | E000 | 2026-08-02 | state | 1 | quick: 同上 | 0.2414 | 0.4528 | 0.80x | loss=1.24，疑似 Tr/BCE 不匹配（见 §4.4），待修正后重测 |
 | E000 | 2026-08-02 | dynamic | 1 | quick: 同上 | 0.2460 | 0.4533 | 0.81x | 同上 |
-| E001 | 待补 | 复现 vector 基线（ml-1m，正式超参） | - | - | - | - | - | RQ1 对照基线 |
-| E002 | 待补 | state vs vector（同参数） | 见 A-1 | - | - | - | - | RQ1 |
-| E003 | 待补 | static vs dynamic | 见 A-1 | - | - | - | - | **RQ2（核心）** |
+| E001 | 2026-08-07 | vector | - | ml-1m, epochs=200, hidden=50, blocks=2, heads=1, maxlen=200, BPR, GPU | 0.5852 | 0.8151 | 1.00x | 基线（=V） |
+| E001 | 2026-08-07 | density_feature | 1 | 同上 | 0.5745 | 0.8116 | 0.98x | 接近基线：二阶 feature 不伤（M1） |
+| E001 | 2026-08-07 | state | 1 | 同上 | 0.4622 | 0.7214 | 0.79x | **DS < V（-21%）**；诊断为 Tr 打分压缩（§6.1），非理论失败 |
+| E001 | 2026-08-07 | dynamic | 1 | 同上 | 0.4950 | 0.7682 | 0.85x | **DDS > DS（+7%）**（RQ2 部分成立）；仍 < VE（-11.7%） |
+| E001 | 2026-08-07 | vector_evolve | 1 | 同上 | 0.5604 | 0.7975 | 0.96x | VE 对照（向量 EMA） |
+| E002 | 待跑 | **Phase 1 rank ablation**：state/dynamic rank=4/8/16（ml-1m 200ep） | - | - | - | - | - | 最高优先级：验证 r 是否把 DS 拉回 V 之上（Case A/B） |
+| E003 | 待跑 | **Phase 2 matching ablation**：dynamic r8，dot vs Tr（`--matching`） | 8 | - | - | - | - | 验证 H3：operator vs vector matching |
 
 > 追加规则：每完成一个实验，新增一行；"结论"栏写清楚该实验支撑/否定了哪个 RQ；同一配置复跑则覆盖行并备注。
+
+### 6.1 第一轮诊断结论（2026-08-07，`diagnose.py`，ml-1m，15 steps，CPU）
+
+| 量 | vector | state r8 | dynamic r8 | 判读 |
+|---|---|---|---|---|
+| s_pos mean / std | 0.063 / 0.197 | 0.0267 / 0.0092 | 0.0332 / 0.0192 | **Tr 打分压缩到 [0, ~0.05] 且方差极小** → BPR 边际 s_pos−s_neg≈0.003–0.01，排序信号微弱 |
+| score∈[−0.2,0.2] 比例 | 70% | 100% | 100% | density 归一化相似度被高维集中现象吞噬 |
+| 最后 attention 梯度范数 | 0.025 | 0.048 | 0.038 | **不是梯度消失**（density 反而更高） |
+| \|\|h\| / \|\|L\|\|_F | 7.09±0.02 | 10.0±0.69 | 10.8±1.3 | 模长信息存在但被 trace 归一化丢弃 |
+
+**结论**：失败主因 = **归一化打分量级问题**（非理论、非梯度）。`Tr(ρ_uρ_i)` 在 d=50 下天然压缩 → 支持 **Phase 3 Confidence-aware Scoring**（`score=Tr×(‖L_u‖‖L_i‖)^γ`，恢复尺度）。
+**预判**：rank ablation 大概率呈 Case B（rank 提升有限，因瓶颈在打分尺度而非秩）——仍需跑以排除配置因素、验证 mixed state 增益。
 
 ---
 
@@ -257,6 +273,8 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 | 2026-08-02 | model.py | 新增 `StateProjection`（低秩 Cholesky-like 密度矩阵）、`StateTransition`（凸组合演化，fixed/learnable）；`SASRec` 支持 `variant` | `vector` 分支与原实现完全一致，保证基线可复现 |
 | 2026-08-02 | main.py | 新增 `--variant/--state_rank/--transition/--transition_alpha` 参数 | 向后兼容（默认 vector） |
 | 2026-08-02 | run_experiments.py | 批量跑多方案并汇总指标 | 见 §5.6 |
+| 2026-08-07 | diagnose.py | 新增 Phase 0 诊断脚本（norm / score / gradient） | 只读，不改模型结构 |
+| 2026-08-07 | agent/research_plan.md | 新增：诊断 + rank/matching ablation 执行计划 | 冻结模型，实验决定最终模型 |
 | 2026-08-02 | test_smoke.py | 冒烟测试：验证三种 variant 的 forward/predict/backward 与密度矩阵合法性 | ✅ 已通过（PSD + trace=1 校验） |
 | 🔜 待做 | model.py | 实现 `dynamic-adaptive`：$\alpha_t=\sigma(W[h_t;e_{i_t}]+b)$ | 贡献2，见 §4.3 |
 | ✅ 2026-08-03 | model.py / main.py / run_experiments.py | Tr 打分修正：state/dynamic 打分做 logit 变换；`--loss bce|bpr` 可切换 | 冒烟通过；1-epoch loss 1.24→1.08 |
