@@ -112,3 +112,46 @@ I7. item 独立 Proj 消融。
 
 请给出：1) 哪些理论必须补/哪些该删（尤其 Q1/Q2）；2) 哪些想法值得做（I1–I7 排序）；3) 理论是否足以支撑 WWW 投稿，还缺什么。
 ```
+
+---
+
+## 六、结果反馈与下一步（2026-08-08，可直接复制给 GPT）
+
+> 阶段：第一轮全量（E001）+ **Phase 1 rank ablation** + **Phase 2 matching ablation** 已跑完（ml-1m，200 epochs，BPR，GPU）。文档：`02_research_log.md` §6/§6.1/§6.2、`agent/research_plan.md`。
+
+### 结果（ml-1m）
+
+| variant | NDCG@10 | R@10 | 备注 |
+|---|---|---|---|
+| vector (V) | **0.5852** | **0.8151** | 基线 |
+| density_feature r1 | 0.5745 | 0.8116 | 接近 V |
+| vector_evolve | 0.5604 | 0.7975 | 向量 EMA 对照 |
+| state r1 | 0.4622 | 0.7214 | Tr 打分 |
+| state r4 | 0.53 | 0.79 | **rank ablation 最高** |
+| state r8 / r16 | ~0.5 | ~0.78 | r4 为峰值，更高不升 |
+| dynamic r1 | 0.4950 | 0.7682 | DDS > DS（+7%） |
+| dynamic r4 / r8 / r16 | 0.4x | 0.7x | 高 rank 无益（甚至更差） |
+| state `--matching dot` | 0.52 | 0.79 | **dot > trace**（0.52 vs 0.4622） |
+
+### 诊断（`diagnose.py`，§6.1）
+- Tr 打分压缩到 [0, ~0.05] 且 std 极小（0.006–0.02）；score∈[−0.2,0.2] 比例 100%；
+- 最后 attention 梯度范数 density > vector（**非梯度问题**）；‖L‖_F 有方差（10±0.7）但被 trace 归一化丢弃。
+
+### 我的判断（倾向）
+1. **失败主因 = 打分尺度 / 归一化**（非理论、非梯度）：Tr 归一化相似度在高维集中；
+2. **rank 提供小幅增益**（r4 > r1）但不足以超 V → mixed state 有效但被打分压制；
+3. **dot（带尺度）> trace** → 恢复尺度是突破口；
+4. **dynamic 高 rank 训练难**（参数多 + 演化串行）→ 建议 dynamic 保持低 rank（1/4），专注打分改进。
+
+### 待 GPT 决策
+**Q1. Phase 3 Confidence-aware Scoring 选哪种形式？**
+- A. $\mathrm{score}=\mathrm{Tr}(\rho_u\rho_i)\cdot(\|L_u\|_F\|L_i\|_F)^\gamma$，γ 可学习（density=分布、norm=置信度）；
+- B. 不归一化二阶匹配 $\mathrm{score}=\|L_u^\top L_i\|_F^2$（恢复尺度，量级需缩放）；
+- C. 温度缩放 $\mathrm{logits}=\mathrm{logit}(\mathrm{Tr})/T$ 或 $\mathrm{score}=\mathrm{Tr}^\tau$；
+- D. 混合 $\mathrm{score}=w\cdot\mathrm{Tr}+(1-w)\cdot\mathrm{dot}$（可学习 $w$）。
+
+**Q2.** γ 初始化与约束（0 起 vs 1 起；是否 clamp）？
+**Q3.** dynamic 是否固定 rank=1/4、只改打分（避开高 rank 训练困难）？
+**Q4.** 是否优先跑稀疏数据集（Beauty）验证"density 优势在稀疏/低维集中不严重时才显现"（ml-1m 稠密是最不利场景）？
+**Q5.** 打分形式确定后，贡献/叙事如何调整（C3 operator matching 是否降级为可选项）？
+

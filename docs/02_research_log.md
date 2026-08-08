@@ -247,8 +247,10 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 | E001 | 2026-08-07 | state | 1 | 同上 | 0.4622 | 0.7214 | 0.79x | **DS < V（-21%）**；诊断为 Tr 打分压缩（§6.1），非理论失败 |
 | E001 | 2026-08-07 | dynamic | 1 | 同上 | 0.4950 | 0.7682 | 0.85x | **DDS > DS（+7%）**（RQ2 部分成立）；仍 < VE（-11.7%） |
 | E001 | 2026-08-07 | vector_evolve | 1 | 同上 | 0.5604 | 0.7975 | 0.96x | VE 对照（向量 EMA） |
-| E002 | 待跑 | **Phase 1 rank ablation**：state/dynamic rank=4/8/16（ml-1m 200ep） | - | - | - | - | - | 最高优先级：验证 r 是否把 DS 拉回 V 之上（Case A/B） |
-| E003 | 待跑 | **Phase 2 matching ablation**：dynamic r8，dot vs Tr（`--matching`） | 8 | - | - | - | - | 验证 H3：operator vs vector matching |
+| E002 | 2026-08-08 | state | 4 | ml-1m, epochs=200, BPR, GPU | 0.53 | 0.79 | 0.91x | **rank 有增益（r4 > r1 0.4622）**，但仍 < V（0.5852）；Case A 部分成立 |
+| E002 | 2026-08-08 | state | 8/16 | 同上 | ~0.5 | ~0.78 | - | r4 为最高，r8/r16 无进一步增益 → 接近 Case B |
+| E002 | 2026-08-08 | dynamic | 4/8/16 | 同上 | 0.4x | 0.7x | - | **dynamic 高 rank 无益（甚至更差）**：演化+高 rank 优化更难 |
+| E003 | 2026-08-08 | state | 1 | --matching dot | 0.52 | 0.79 | 0.89x | **dot > trace（0.52 vs 0.4622）**：一阶方向+原始尺度优于归一化 Tr → 支持“Tr 压缩是瓶颈” |
 
 > 追加规则：每完成一个实验，新增一行；"结论"栏写清楚该实验支撑/否定了哪个 RQ；同一配置复跑则覆盖行并备注。
 
@@ -263,6 +265,21 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 
 **结论**：失败主因 = **归一化打分量级问题**（非理论、非梯度）。`Tr(ρ_uρ_i)` 在 d=50 下天然压缩 → 支持 **Phase 3 Confidence-aware Scoring**（`score=Tr×(‖L_u‖‖L_i‖)^γ`，恢复尺度）。
 **预判**：rank ablation 大概率呈 Case B（rank 提升有限，因瓶颈在打分尺度而非秩）——仍需跑以排除配置因素、验证 mixed state 增益。
+
+### 6.2 Phase 1/2 结果分析（2026-08-08）
+
+| 结论 | 证据 |
+|---|---|
+| rank 有增益但有限 | state r4 (0.53) > state r1 (0.4622)，但仍 < V (0.5852)；r8/r16 不升 |
+| dynamic 高 rank 无益 | dynamic r4/8/16 均 0.4x/0.7x，未超 dynamic r1 (0.4950) |
+| **dot > trace（关键）** | state dot (0.52) > state trace (0.4622)：一阶方向 + 原始尺度 > 归一化 Tr |
+
+**综合判断**：三个证据一致指向 **打分尺度 / 归一化是瓶颈**（呼应 §6.1）：
+1. Tr 打分压缩到 [0, ~0.05]（§6.1）；
+2. rank 提升（mixed state）只带来小幅增益，不足以弥补尺度损失；
+3. dot（带尺度）显著优于 trace。
+
+→ **支持 Phase 3 Confidence-aware Scoring**：`score = Tr(ρ_uρ_i)·(‖L_u‖_F·‖L_i‖_F)^γ`（γ 可学习），density 负责 preference distribution、norm 负责 preference confidence。
 
 ---
 
