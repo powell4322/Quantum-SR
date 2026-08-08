@@ -64,11 +64,20 @@ python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr 
 ```
 > 预判（`research_log` §6.1）：瓶颈在打分尺度而非秩，rank 提升可能有限（Case B 风险）；跑完对照诊断决定是否进 Phase 3（confidence-aware scoring）。
 
-### Step 3 — Phase 2 Matching Ablation（ml-1m，dynamic r8，dot vs Tr）
+### Step 3 — E004 Operator Scoring Ablation（ml-1m，r4，核心实验，`agent/research_plan.md` Phase 3）
+验证：covariance / confidence 是否解决 preference intensity loss。
 ```bash
-python main.py --dataset ml-1m --train_dir rq3_ds_dot  --variant state   --matching dot --device cuda --loss bpr --num_epochs 200
-python main.py --dataset ml-1m --train_dir rq3_dds_dot --variant dynamic --matching dot --device cuda --loss bpr --num_epochs 200
+# 基准：state-r4 + trace（E002 已有 0.53）
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants state --state_rank 4 --tag e004
+# 关键：covariance（state / dynamic 各 r4）
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants state dynamic --state_rank 4 --scoring covariance --tag e004
+# 最终版：confidence（γ 可后续调）
+python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr \
+    --variants state dynamic --state_rank 4 --scoring confidence --scoring_gamma 1.0 --tag e004
 ```
+> 判定：covariance 接近/超过 SASRec(0.5852) → 论文核心成立；dynamic > state → DDS 有效。
 
 ### Step 4 — 主实验 · Beauty / Steam（待 rank 结论后；稀疏 / 长尾验证）
 ```bash

@@ -58,6 +58,7 @@ def run_one(args, variant, rank):
         "--eval_every", str(args.eval_every),
         "--loss", args.loss,
         "--matching", args.matching,
+        "--scoring", args.scoring,
     ]
     name = "{}_r{}".format(variant, rank)
 
@@ -105,6 +106,7 @@ def main():
     parser.add_argument("--eval_every", type=int, default=20)
     parser.add_argument("--loss", default="bpr", choices=["bce", "bpr"])
     parser.add_argument("--matching", default="trace", choices=["trace", "dot"])
+    parser.add_argument("--scoring", default="trace", choices=["trace", "covariance", "confidence"])
     args = parser.parse_args()
 
     os.makedirs("results", exist_ok=True)

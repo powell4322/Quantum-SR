@@ -49,6 +49,15 @@ class StateProjection(torch.nn.Module):
         rho = rho / norm.unsqueeze(-1).unsqueeze(-1).clamp_min(1e-8)  # normalize to trace=1
         return rho
 
+    def covariance(self, inputs):
+        """未归一化 preference covariance operator C = L^T L（PSD，trace 可变）。
+
+        与 ρ = C/Tr(C) 的关系：ρ 保留 direction、C 同时保留 direction 与 intensity（preference energy）。
+        2026-08-08：E004 核心（normalized matching 丢失强度 → covariance matching 保留）。
+        """
+        L, _ = self.lowrank(inputs)
+        return torch.matmul(L.transpose(-1, -2), L)  # (..., C, C)
+
     def direction(self, inputs):
         """一阶方向向量（RQ3 的 dot matching 用）。
 
@@ -146,6 +155,11 @@ class SASRec(torch.nn.Module):
         self.transition_mode = getattr(args, 'transition', 'fixed')
         self.transition_alpha = getattr(args, 'transition_alpha', 0.9)
         self.matching = getattr(args, 'matching', 'trace')  # trace | dot（RQ3 匹配消融）
+        self.scoring = getattr(args, 'scoring', 'trace')  # trace | covariance | confidence（E004）
+        self.scoring_gamma = getattr(args, 'scoring_gamma', 1.0)
+        # 统一打分 power：s = raw · (norm_u·norm_i)^power（trace:-1 | covariance:0 | confidence:γ-1）
+        self._scoring_power = {'trace': -1.0, 'covariance': 0.0,
+                               'confidence': self.scoring_gamma - 1.0}.get(self.scoring, -1.0)
 
         self.state_proj = None
         self.state_transition = None
@@ -162,23 +176,30 @@ class SASRec(torch.nn.Module):
             # DMPEN-style: lift item embeddings to density features before the encoder
             self.df_input = DensityFeatureInput(args.hidden_units, rank=self.state_rank)
 
-    def _to_state_sequence(self, log_feats):
-        """把 (U, T, C) 的向量序列转成 (U, T, C, C) 的密度矩阵序列；
-        dynamic 变体再沿时间维做凸组合演化（ρ_0 = I/d，见 docs/09_theory_v1.md）。"""
-        rho_seq = self.state_proj(log_feats)  # (U, T, C, C)
+    def _to_state_sequence(self, log_feats, normalize=True):
+        """把 (U,T,C) 向量序列转成状态序列 (U,T,C,C)。
+
+        normalize=True：ρ = C/Tr(C)（trace=1，ρ_0 = I/d）；
+        normalize=False：preference covariance C = L^T L（不归一化、trace 可变，ρ_0 = I）；
+        dynamic 变体沿时间维做凸组合演化（保 PSD）。
+        """
+        if normalize:
+            state_seq = self.state_proj(log_feats)  # (U, T, C, C)
+        else:
+            state_seq = self.state_proj.covariance(log_feats)
         if self.variant == 'dynamic':
-            T = rho_seq.shape[1]
-            C = rho_seq.shape[-1]
+            T = state_seq.shape[1]
+            C = state_seq.shape[-1]
             outputs = []
-            # ρ_0 = I/d（最大混合态先验）
-            prev = (torch.eye(C, device=rho_seq.device) / C).unsqueeze(0).expand(rho_seq.shape[0], -1, -1)
+            init = (torch.eye(C, device=state_seq.device) / C) if normalize else torch.eye(C, device=state_seq.device)
+            prev = init.unsqueeze(0).expand(state_seq.shape[0], -1, -1)
             for t in range(T):
-                cur = rho_seq[:, t]  # (U, C, C)
+                cur = state_seq[:, t]  # (U, C, C)
                 cur = self.state_transition(prev, cur)
                 outputs.append(cur)
                 prev = cur
-            rho_seq = torch.stack(outputs, dim=1)
-        return rho_seq
+            state_seq = torch.stack(outputs, dim=1)
+        return state_seq
 
     def _vector_evolve(self, log_feats):
         """VE：对编码器输出 (U,T,C) 沿时间做 EMA（向量凸组合）。
@@ -221,6 +242,30 @@ class SASRec(torch.nn.Module):
         tmp = torch.matmul(L_b, torch.matmul(rho, L_b.transpose(-1, -2)))  # (..., r, r)
         fro = torch.diagonal(tmp, dim1=-2, dim2=-1).sum(dim=-1)
         return fro / norm_b.clamp_min(eps)
+
+    @staticmethod
+    def _fro_lowrank(L_a, L_b):
+        """||L_a^T L_b||_F^2（未归一化 covariance matching 分子，= Tr(C_a C_b)）。"""
+        cross = torch.matmul(L_a, L_b.transpose(-1, -2))  # (..., r, r)
+        return (cross * cross).sum(dim=(-1, -2))
+
+    @staticmethod
+    def _fro_mixed(rho, L_b):
+        """Tr(ρ_a L_b L_b^T)（未归一化分子；ρ_a 为演化后的混合态）。"""
+        tmp = torch.matmul(L_b, torch.matmul(rho, L_b.transpose(-1, -2)))  # (..., r, r)
+        return torch.diagonal(tmp, dim1=-2, dim2=-1).sum(dim=-1)
+
+    @staticmethod
+    def _power_score(raw, norm_u, norm_i, power, eps=1e-8):
+        """统一 operator 打分：s = raw · (norm_u · norm_i)^power。
+
+        trace: power=-1（= Tr(ρ_u ρ_i)）| covariance: power=0（= Tr(C_u C_i)）|
+        confidence: power=γ-1（= Tr(C_u C_i)(c_u c_i)^(γ-1)，γ=1 时退化为 covariance）。
+        2026-08-08：E004，见 docs/07_discussion_gpt.md §6 与 agent/research_plan.md。
+        """
+        if abs(power) < 1e-9:
+            return raw
+        return raw * (norm_u * norm_i).clamp_min(eps).pow(power)
 
     @staticmethod
     def state_entropy(rho, eps=1e-8):
@@ -271,22 +316,41 @@ class SASRec(torch.nn.Module):
 
         if self.variant in ('state', 'dynamic'):
             if self.matching == 'trace':
-                if self.variant == 'dynamic':
-                    # 精确演化需在 operator space（C×C）做凸组合以保持合法性；打分用低秩（item 侧 L，O(C r^2)）。
-                    # factor-space 演化（rank truncation / low-rank update）是 future approximation，不改第一版语义。
-                    rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-                    L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
-                    L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
-                    pos_s = self._hs_mixed(rho_seq, L_pos, norm_pos)  # (U, T)
-                    neg_s = self._hs_mixed(rho_seq, L_neg, norm_neg)
-                else:  # state：完全低秩（不构造 rho），耗时接近 vector
-                    L_user, norm_user = self.state_proj.lowrank(log_feats)
-                    L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
-                    L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
-                    pos_s = self._hs_lowrank(L_user, norm_user, L_pos, norm_pos)
-                    neg_s = self._hs_lowrank(L_user, norm_user, L_neg, norm_neg)
-                pos_logits = self._logit_score(pos_s)
-                neg_logits = self._logit_score(neg_s)
+                if self.scoring == 'trace':
+                    # 归一化 Tr（现有路径，保持数值不变）
+                    if self.variant == 'dynamic':
+                        # 精确演化需在 operator space（C×C）做凸组合以保持合法性；打分用低秩（item 侧 L，O(C r^2)）。
+                        rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                        L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                        L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                        pos_s = self._hs_mixed(rho_seq, L_pos, norm_pos)  # (U, T)
+                        neg_s = self._hs_mixed(rho_seq, L_neg, norm_neg)
+                    else:  # state：完全低秩（不构造 rho）
+                        L_user, norm_user = self.state_proj.lowrank(log_feats)
+                        L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                        L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                        pos_s = self._hs_lowrank(L_user, norm_user, L_pos, norm_pos)
+                        neg_s = self._hs_lowrank(L_user, norm_user, L_neg, norm_neg)
+                    pos_logits = self._logit_score(pos_s)
+                    neg_logits = self._logit_score(neg_s)
+                else:
+                    # covariance / confidence：统一打分 s = raw·(norm_u·norm_i)^power（无界，不做 logit）
+                    power = self._scoring_power
+                    if self.variant == 'dynamic':
+                        C_seq = self._to_state_sequence(log_feats, normalize=False)  # (U,T,C,C) 未归一化
+                        n_u = torch.diagonal(C_seq, dim1=-2, dim2=-1).sum(dim=-1)  # Tr(C_t), (U,T)
+                        L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                        L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                        pos_s = self._power_score(self._fro_mixed(C_seq, L_pos), n_u, norm_pos, power)
+                        neg_s = self._power_score(self._fro_mixed(C_seq, L_neg), n_u, norm_neg, power)
+                    else:  # state
+                        L_user, norm_user = self.state_proj.lowrank(log_feats)  # (U,T,r,C)
+                        L_pos, norm_pos = self.state_proj.lowrank(self.item_emb(torch.LongTensor(pos_seqs).to(self.dev)))
+                        L_neg, norm_neg = self.state_proj.lowrank(self.item_emb(torch.LongTensor(neg_seqs).to(self.dev)))
+                        pos_s = self._power_score(self._fro_lowrank(L_user, L_pos), norm_user, norm_pos, power)
+                        neg_s = self._power_score(self._fro_lowrank(L_user, L_neg), norm_user, norm_neg, power)
+                    pos_logits = pos_s
+                    neg_logits = neg_s
             else:  # matching=dot：一阶方向 dot（RQ3 对照；dynamic 时对方向做向量 EMA）
                 u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
                 if self.variant == 'dynamic':
@@ -319,18 +383,34 @@ class SASRec(torch.nn.Module):
         if self.variant in ('state', 'dynamic'):
             if self.matching == 'trace':
                 item_embs = self.item_emb(torch.LongTensor(item_indices).to(self.dev))  # (U, I, C)
-                if self.variant == 'dynamic':
-                    rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
-                    rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) last state
-                    L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
-                    s = self._hs_mixed(rho_user, L_item, norm_item)  # (U, I)
-                else:  # state：完全低秩
-                    L_user, norm_user = self.state_proj.lowrank(log_feats)
-                    L_user = L_user[:, -1, :, :].unsqueeze(1)  # (U, 1, r, C)
-                    norm_user = norm_user[:, -1].unsqueeze(1)  # (U, 1)
-                    L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
-                    s = self._hs_lowrank(L_user, norm_user, L_item, norm_item)
-                logits = self._logit_score(s)
+                if self.scoring == 'trace':
+                    if self.variant == 'dynamic':
+                        rho_seq = self._to_state_sequence(log_feats)  # (U, T, C, C)
+                        rho_user = rho_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C) last state
+                        L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
+                        s = self._hs_mixed(rho_user, L_item, norm_item)  # (U, I)
+                    else:  # state：完全低秩
+                        L_user, norm_user = self.state_proj.lowrank(log_feats)
+                        L_user = L_user[:, -1, :, :].unsqueeze(1)  # (U, 1, r, C)
+                        norm_user = norm_user[:, -1].unsqueeze(1)  # (U, 1)
+                        L_item, norm_item = self.state_proj.lowrank(item_embs)  # (U, I, r, C)
+                        s = self._hs_lowrank(L_user, norm_user, L_item, norm_item)
+                    logits = self._logit_score(s)
+                else:
+                    # covariance / confidence：无界打分，不做 logit
+                    power = self._scoring_power
+                    if self.variant == 'dynamic':
+                        C_seq = self._to_state_sequence(log_feats, normalize=False)
+                        C_u = C_seq[:, -1, :, :].unsqueeze(1)  # (U, 1, C, C)
+                        n_u = torch.diagonal(C_u, dim1=-2, dim2=-1).sum(dim=-1)  # (U, 1)
+                        L_item, norm_item = self.state_proj.lowrank(item_embs)
+                        logits = self._power_score(self._fro_mixed(C_u, L_item), n_u, norm_item, power)
+                    else:
+                        L_user, norm_user = self.state_proj.lowrank(log_feats)
+                        L_user = L_user[:, -1, :, :].unsqueeze(1)
+                        norm_user = norm_user[:, -1].unsqueeze(1)
+                        L_item, norm_item = self.state_proj.lowrank(item_embs)
+                        logits = self._power_score(self._fro_lowrank(L_user, L_item), norm_user, norm_item, power)
             else:  # matching=dot：一阶方向 dot（RQ3 对照）
                 u_seq = self.state_proj.direction(log_feats)  # (U, T, C)
                 if self.variant == 'dynamic':

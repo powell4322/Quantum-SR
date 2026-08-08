@@ -49,7 +49,7 @@
 |---|---|---|---|---|
 | RQ1 | density representation 是否有效 | E001 | V vs DF vs DS | R@10 / NDCG@10 |
 | RQ2 | dynamic evolution 是否有效 | E002 | DS vs DDS；E003 α 扫描 0.1–0.9 + **ρ₀ 初始化消融（I/d / 首观测 / 可学习）** | R@10 / NDCG@10 |
-| RQ3 | operator similarity 是否有效 | E004 | matching：trace vs dot（`--matching`）；legality 消融（remove PSD / remove trace） | R@10 / NDCG@10 |
+| RQ3 | operator states 如何同时保留 distribution 与 confidence | E004 | scoring：trace vs covariance vs confidence（`--scoring`）；matching：trace vs dot（`--matching`） | R@10 / NDCG@10 |
 | RQ4 | uncertainty 是否合理 | E005 | entropy 分组（低/中/高）+ interest-shift（前 50 A → 后 50 B） | entropy / adaptation steps |
 
 > 指标：**R@10（Recall@10）与 NDCG@10**。注意：本评估协议每用户 1 个 ground-truth + 100 负采样，**HR@10 ≡ Recall@10（数值等价）**，统一按 R@10 报告（代码已改为输出 Recall@10，见 `utils.py` 注释）。

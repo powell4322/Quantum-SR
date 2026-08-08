@@ -34,6 +34,8 @@ parser.add_argument('--transition_alpha', default=0.9, type=float)
 parser.add_argument('--eval_every', default=20, type=int)
 parser.add_argument('--loss', default='bpr', type=str, choices=['bce', 'bpr'])
 parser.add_argument('--matching', default='trace', type=str, choices=['trace', 'dot'], help='RQ3 匹配消融：trace=Tr(rho_u rho_i)（HS），dot=一阶方向 dot')
+parser.add_argument('--scoring', default='trace', type=str, choices=['trace', 'covariance', 'confidence'], help='E004 operator 打分：trace=归一化 Tr(rho_u rho_i)；covariance=未归一化 Tr(C_u C_i)；confidence=Tr(C_u C_i)(c_u c_i)^(gamma-1)')
+parser.add_argument('--scoring_gamma', default=1.0, type=float, help='confidence scoring 的 γ（γ=1 退化为 covariance）')
 
 args = parser.parse_args()
 if not os.path.isdir(args.dataset + '_' + args.train_dir):

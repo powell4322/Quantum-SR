@@ -281,6 +281,16 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 
 → **支持 Phase 3 Confidence-aware Scoring**：`score = Tr(ρ_uρ_i)·(‖L_u‖_F·‖L_i‖_F)^γ`（γ 可学习），density 负责 preference distribution、norm 负责 preference confidence。
 
+### 6.3 采纳 review：Operator Scoring Redesign（2026-08-08）
+
+**重新定位**：失败不是“密度状态假设失败”，而是 **normalized operator matching 与推荐排序目标不匹配**——$s=\|L_u^\top L_i\|_F^2/(\|L_u\|^2\|L_i\|^2)$ 只保留 direction、丢失 preference intensity。
+
+**概念转变**：density operator $\rho=C/\mathrm{Tr}(C)$（trace=1、只保留 direction）→ **Preference Covariance Operator** $C=LL^\top$（不归一化、保留 direction + intensity）。
+
+**已实现 `--scoring {trace,covariance,confidence}`**（统一打分 $s=\mathrm{raw}\cdot(\mathrm{norm}_u\mathrm{norm}_i)^{power}$；covariance/confidence 无界不做 logit；trace 路径数值不变；smoke + 1-epoch 通过）。
+- **E004**：state/dynamic r4 × {trace, covariance, confidence}（命令见 `10_server_run.md` Step 3）。
+- 判定：covariance 接近/超过 SASRec(0.5852) → 论文核心成立；dynamic>state → DDS 有效。
+
 ---
 
 ## 7. 代码修改记录
@@ -292,6 +302,7 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 | 2026-08-02 | run_experiments.py | 批量跑多方案并汇总指标 | 见 §5.6 |
 | 2026-08-07 | diagnose.py | 新增 Phase 0 诊断脚本（norm / score / gradient） | 只读，不改模型结构 |
 | 2026-08-07 | agent/research_plan.md | 新增：诊断 + rank/matching ablation 执行计划 | 冻结模型，实验决定最终模型 |
+| 2026-08-08 | model.py / main.py / run_experiments.py | 新增 `--scoring {trace,covariance,confidence}` + `--scoring_gamma`（统一打分 `_power_score`）；`_to_state_sequence(normalize)`；`StateProjection.covariance` | E004：从 ρ（归一化）转 C（covariance，保留强度）；trace 路径数值不变 |
 | 2026-08-02 | test_smoke.py | 冒烟测试：验证三种 variant 的 forward/predict/backward 与密度矩阵合法性 | ✅ 已通过（PSD + trace=1 校验） |
 | 🔜 待做 | model.py | 实现 `dynamic-adaptive`：$\alpha_t=\sigma(W[h_t;e_{i_t}]+b)$ | 贡献2，见 §4.3 |
 | ✅ 2026-08-03 | model.py / main.py / run_experiments.py | Tr 打分修正：state/dynamic 打分做 logit 变换；`--loss bce|bpr` 可切换 | 冒烟通过；1-epoch loss 1.24→1.08 |

@@ -26,6 +26,8 @@ def make_args(variant, rank=1, device="cpu"):
         transition="fixed",
         transition_alpha=0.9,
         matching="trace",
+        scoring="trace",
+        scoring_gamma=1.0,
     )
 
 
@@ -43,10 +45,13 @@ def check_state_legality(rho, tag):
     print("    [OK] {}: trace_err={:.2e}, min_eig={:.2e}".format(tag, err_trace, min_eig))
 
 
-def run_variant(variant, rank=1, matching="trace"):
-    print("\n=== variant = {} (rank={}, matching={}) ===".format(variant, rank, matching))
+def run_variant(variant, rank=1, matching="trace", scoring="trace", scoring_gamma=1.0):
+    print("\n=== variant = {} (rank={}, matching={}, scoring={}{}) ===".format(
+        variant, rank, matching, scoring, ",gamma={}".format(scoring_gamma) if scoring == "confidence" else ""))
     args = make_args(variant, rank)
     args.matching = matching
+    args.scoring = scoring
+    args.scoring_gamma = scoring_gamma
     model = SASRec(user_num=100, item_num=50, args=args)
     model.train()
 
@@ -148,6 +153,10 @@ if __name__ == "__main__":
     # RQ3：dot matching（一阶方向 dot）在 state/dynamic 下也应通过
     for v in ("state", "dynamic"):
         run_variant(v, matching="dot")
+    # E004：covariance / confidence scoring（state 与 dynamic）也应通过
+    for v in ("state", "dynamic"):
+        run_variant(v, scoring="covariance")
+        run_variant(v, scoring="confidence", scoring_gamma=0.5)
     # 稳健等价性：不同 batch/rank/seed 下 low-rank == 显式 matrix（state 与 dynamic）
     check_lowrank_equiv_robust()
     print("\nALL SMOKE TESTS PASSED")

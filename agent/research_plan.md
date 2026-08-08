@@ -85,8 +85,27 @@
 ### Phase 2：Matching Ablation
 固定 `dynamic rank=8`，比较 Operator Matching $\mathrm{Tr}(\rho_u\rho_i)$ vs Vector Matching $L_u^\top L_i$，验证 $H3$（operator interaction 更好）。
 
-### Phase 3：Confidence-aware Scoring（候选增强）
-若 rank=8 有效但仍低于 SASRec，加入 $\mathrm{score}=\mathrm{Tr}(\rho_u\rho_i)\times(\|L_u\|_F\|L_i\|_F)^\gamma$（$\gamma$ 可学习）。理论解释：density 负责 preference distribution，norm 负责 preference confidence。
+### Phase 3：Operator Scoring Redesign（2026-08-08 采纳 review 重定义）
+**核心发现（E001/E002/E003 + 诊断）**：失败不是 density 表示，而是 **normalized matching 丢失 preference intensity**（$s=\|L_u^\top L_i\|_F^2/(\|L_u\|^2\|L_i\|^2)$ 只留方向）。
+
+**概念转变**：density operator $\rho=\frac{C}{\mathrm{Tr}(C)}$（trace=1，只保留 direction）→ **preference covariance operator** $C=LL^\top$（不归一化，同时保留 direction 与 intensity）。
+
+**统一打分**（已实现 `--scoring`，低秩 $O(dr^2)$）：
+$$s=\mathrm{raw}\cdot(\mathrm{norm}_u\cdot\mathrm{norm}_i)^{power},\qquad \mathrm{raw}=\|L_u^\top L_i\|_F^2=\mathrm{Tr}(C_uC_i)$$
+- `trace`（power=-1）：归一化 Tr（现状）；
+- `covariance`（power=0）：$\mathrm{Tr}(C_uC_i)$，**E004 第一实验**（验证“是否 normalization 导致失败”）；
+- `confidence`（power=γ−1）：$\mathrm{Tr}(C_uC_i)(c_uc_i)^{\gamma-1}$，**最终论文版**（γ=1 退化为 covariance）。
+
+**E004 实验**（scoring ablation only，不改架构）：
+| 模型 | 目的 |
+|---|---|
+| state-r4 + trace | 基准（E002 已有 0.53） |
+| state-r4 + covariance | 证明 score 问题 |
+| dynamic-r4 + covariance | 证明动态是否有效（若 > state 则 DDS 有效） |
+
+判定：covariance 接近/超过 SASRec(0.5852) → 论文核心成立；dynamic>state → DDS 有效。
+
+**新贡献（去 quantum/trace 表述）**：C1 Dynamic Operator State Representation；C2 Confidence-aware Operator Matching（发现并解决 intensity loss）；C3 Temporal Preference Evolution。
 
 ---
 

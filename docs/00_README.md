@@ -31,8 +31,8 @@
 
 **定位 source of truth = `09_research_positioning_v2.md`（DDST）**；SASRec 唯一 backbone，指标 R@10 / NDCG@10。
 
-**当前阶段（第一轮 ml-1m 结果已出，见 `02_research_log.md` §6/§6.1）**：V(0.5852) > DF(0.5745) > VE(0.5604) > DDS(0.4950) > DS(0.4622)。**诊断结论**：失败主因 = Tr 打分被压缩到 [0,0.05]（归一化相似度高维集中），非理论/非梯度。
-**下一步（冻结模型）**：按 `agent/research_plan.md` 跑 **Phase 1 rank ablation**（state/dynamic rank=4/8/16，命令见 `10_server_run.md` Step 1.5）→ Phase 2 matching ablation → 视结果决定 Phase 3 confidence-aware scoring。
+**当前阶段（2026-08-08）**：Phase 1/2 完成，失败已定位 = **normalized operator matching 丢失 preference intensity**（非密度表示失败）。概念转为 **Preference Covariance Operator C=LLᵀ**（保留方向+强度）。
+**下一步（E004，已实现 `--scoring`）**：state/dynamic r4 × scoring（trace / covariance / confidence），命令见 `10_server_run.md` Step 3；若 covariance 接近/超过 SASRec(0.5852) → 论文核心成立。详见 `agent/research_plan.md` Phase 3。
 
 > 注意：`.github/skills/` 下另有给 Copilot 自动加载的 skill（领域知识、实验协议），非人读文档，无需进本目录。
 

@@ -87,6 +87,20 @@ $$\mathrm{Tr}(\rho_u\rho_i)=\frac{\mathrm{Tr}(L_uL_u^\top L_iL_i^\top)}{\|L_u\|_
 
 **工程价值（可写进论文）**：*Although density states are mathematically defined in operator space, we exploit low-rank factorization to compute Hilbert–Schmidt similarity without explicit matrix construction* —— 直接回应 $O(d^2)$ 扩展性质疑。
 
+### 5.2 Preference Covariance Operator 与 Confidence-aware Matching（2026-08-08）
+
+**动机（E001-E003 + 诊断）**：$\mathrm{Tr}(\rho_u\rho_i)$（归一化）把打分压缩到 $[0,\sim0.05]$ 且丢失 preference intensity → 从 density operator $\rho$ 转 **preference covariance operator** $C$：
+- $C=LL^\top$（PSD、trace 可变）；$\rho=C/\mathrm{Tr}(C)$（trace=1、只保留方向）。
+- 解释：$\rho$ 归一化抹平强度（用户 A $\|L_u\|=20$ vs 用户 B $\|L_u\|=2$ 归一化后相同）；$C$ 保留 preference energy。
+
+**统一打分**（低秩，$O(dr^2)$）：
+$$s(u,i)=\mathrm{raw}\cdot(\mathrm{norm}_u\cdot\mathrm{norm}_i)^{power},\qquad \mathrm{raw}=\|L_u^\top L_i\|_F^2=\mathrm{Tr}(C_uC_i)$$
+- `trace`（power=-1）：$=\mathrm{Tr}(\rho_u\rho_i)$（现状）；
+- `covariance`（power=0）：$=\mathrm{Tr}(C_uC_i)$（E004 第一实验）；
+- `confidence`（power=γ−1）：$=\mathrm{Tr}(C_uC_i)(c_uc_i)^{\gamma-1}$，$c_u=\|L_u\|_F^2$（最终版；γ=1 退化为 covariance）。
+
+**性质**：三种打分共享同一 raw（方向/二阶匹配），仅通过 norm 幂次控制强度贡献 → **同时保留 preference distribution 与 confidence**；covariance/confidence 为无界分数（直接 BPR，不做 logit）。实现：`--scoring` + `_power_score`。
+
 ---
 
 ## 6. 训练目标（Loss）
