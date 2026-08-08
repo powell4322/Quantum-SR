@@ -59,6 +59,7 @@ def run_one(args, variant, rank):
         "--loss", args.loss,
         "--matching", args.matching,
         "--scoring", args.scoring,
+        "--scoring_gamma", str(args.scoring_gamma),
     ]
     name = "{}_r{}".format(variant, rank)
 
@@ -107,6 +108,7 @@ def main():
     parser.add_argument("--loss", default="bpr", choices=["bce", "bpr"])
     parser.add_argument("--matching", default="trace", choices=["trace", "dot"])
     parser.add_argument("--scoring", default="trace", choices=["trace", "covariance", "confidence"])
+    parser.add_argument("--scoring_gamma", default=1.0, type=float)
     args = parser.parse_args()
 
     os.makedirs("results", exist_ok=True)

@@ -291,6 +291,20 @@ uv run main.py --dataset ml-1m --train_dir quant_dynamic --variant dynamic --sta
 - **E004**：state/dynamic r4 × {trace, covariance, confidence}（命令见 `10_server_run.md` Step 3）。
 - 判定：covariance 接近/超过 SASRec(0.5852) → 论文核心成立；dynamic>state → DDS 有效。
 
+### 6.4 E004 前审查 + Gradient-scale 验证（2026-08-08）
+
+**审查结论（采纳）**：BPR loss 无问题；问题 = normalized score 与排序目标信息不足。E004 唯一变量 = score function，**loss 保持 BPR**。当前代码已满足全部审查要点（低秩打分、不过度 normalize、dynamic 用 covariance evolution、BPR 直接吃 score、无 temperature/gate）。
+
+**Gradient-scale（`diagnose.py --scoring`，state-r4，15 steps）**：
+
+| 量 | trace | covariance |
+|---|---|---|
+| s_pos mean / std | 0.028 / 0.014 | 0.202 / 0.267 |
+| **BPR 边际 s_pos−s_neg** | **0.0039** | **0.0796（×20）** |
+| score∈[−0.2,0.2] | 100% | 80.9% |
+
+→ **covariance 恢复强度后 BPR 信号增强 ~20 倍**，score 量级适中不爆炸。E004 可行；判定：covariance ≥0.58 → 核心成立；0.54–0.57 → 需 confidence-aware；~0.50 → 查 state construction / evolution。
+
 ---
 
 ## 7. 代码修改记录

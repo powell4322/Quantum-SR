@@ -78,6 +78,7 @@ python run_experiments.py --dataset ml-1m --epochs 200 --device cuda --loss bpr 
     --variants state dynamic --state_rank 4 --scoring confidence --scoring_gamma 1.0 --tag e004
 ```
 > 判定：covariance 接近/超过 SASRec(0.5852) → 论文核心成立；dynamic > state → DDS 有效。
+> ✅ E004 前审查已过（低秩、不过度 normalize、dynamic=covariance evolution、BPR 直接吃 score）；gradient-scale：covariance 的 BPR 边际 ≈ trace 的 20 倍（见 `02_research_log.md` §6.4）。
 
 ### Step 4 — 主实验 · Beauty / Steam（待 rank 结论后；稀疏 / 长尾验证）
 ```bash

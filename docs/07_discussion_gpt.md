@@ -155,3 +155,35 @@ I7. item 独立 Proj 消融。
 **Q4.** 是否优先跑稀疏数据集（Beauty）验证"density 优势在稀疏/低维集中不严重时才显现"（ml-1m 稠密是最不利场景）？
 **Q5.** 打分形式确定后，贡献/叙事如何调整（C3 operator matching 是否降级为可选项）？
 
+---
+
+## 七、E004 前模型设计审查（2026-08-08，含逐条核对）
+
+> 审查结论（采纳）：BPR loss 本身无问题；问题 = normalized score 与排序目标**信息不足**。E004 唯一变量 = score function，loss 保持 BPR。
+
+### 逐条代码核对（当前实现已满足）
+1. **Score 低秩**：`_fro_lowrank` / `_fro_mixed`（$O(dr^2)$），不构造 $C\times C$ 打分 ✓
+2. **不过度 normalize**：covariance 模式 item/用户侧均用 `lowrank`（无 `F.normalize`）；`StateProjection.covariance()` 不归一化 ✓
+3. **Dynamic 用 covariance evolution**：`_to_state_sequence(normalize=False)`：$C_t=\alpha C_{t-1}+(1-\alpha)\hat C_t$（保 PSD、trace 可变）✓
+4. **BPR 直接吃 score**：covariance/confidence 分支返回 raw（无 logit / sigmoid）✓
+5. **无 temperature / gamma gate / spectral**：E004 前未加入 ✓
+
+### Gradient-scale 验证（`diagnose.py --scoring`，ml-1m，state-r4，15 steps）
+| 量 | trace | covariance |
+|---|---|---|
+| s_pos mean / std | 0.028 / 0.014 | 0.202 / 0.267 |
+| **s_pos − s_neg（BPR 边际）** | **0.0039** | **0.0796（×20）** |
+| score∈[−0.2,0.2] | 100% | 80.9% |
+| grad_norm | 0.069 | 0.027 |
+
+→ **covariance 恢复强度后 BPR 信号增强 ~20 倍**；score 量级适中（不爆炸），$\sigma$ 梯度良好。**E004 可行**。
+
+### E004 判定（研究级）
+- A：covariance ≥0.58 → 核心成立（normalization 是瓶颈）；
+- B：0.54–0.57 → density 有效，需 confidence-aware（最终版）；
+- C：~0.50 → 问题非 scale，需查 state construction / evolution。
+
+### 更新后的论文主线
+> Normalized operator states discard preference confidence. We propose confidence-preserving dynamic operator states for sequential recommendation.
+> Vector → Distribution → Confidence-aware Distribution。
+

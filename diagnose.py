@@ -29,6 +29,8 @@ def parse_args():
                    choices=['vector', 'state', 'dynamic', 'vector_evolve', 'density_feature'])
     p.add_argument('--state_rank', default=1, type=int)
     p.add_argument('--matching', default='trace', choices=['trace', 'dot'])
+    p.add_argument('--scoring', default='trace', choices=['trace', 'covariance', 'confidence'])
+    p.add_argument('--scoring_gamma', default=1.0, type=float)
     p.add_argument('--batch_size', default=128, type=int)
     p.add_argument('--lr', default=0.001, type=float)
     p.add_argument('--maxlen', default=200, type=int)
@@ -97,18 +99,35 @@ def main():
                 item_pos = model.item_emb(pos_t)   # (U, T, C)
                 item_neg = model.item_emb(neg_t)
                 if args.matching == 'trace':
-                    if args.variant == 'dynamic':
-                        rho_u = model._to_state_sequence(log_feats)[:, -1]        # (U, C, C)
-                        L_pos, n_pos = model.state_proj.lowrank(item_pos)
-                        L_neg, n_neg = model.state_proj.lowrank(item_neg)
-                        sp = model._hs_mixed(rho_u, L_pos[:, -1], n_pos[:, -1])
-                        sn = model._hs_mixed(rho_u, L_neg[:, -1], n_neg[:, -1])
-                    else:  # state：完全低秩
-                        L_user, n_user = model.state_proj.lowrank(log_feats)
-                        L_pos, n_pos = model.state_proj.lowrank(item_pos)
-                        L_neg, n_neg = model.state_proj.lowrank(item_neg)
-                        sp = model._hs_lowrank(L_user[:, -1], n_user[:, -1], L_pos[:, -1], n_pos[:, -1])
-                        sn = model._hs_lowrank(L_user[:, -1], n_user[:, -1], L_neg[:, -1], n_neg[:, -1])
+                    if args.scoring == 'trace':
+                        if args.variant == 'dynamic':
+                            rho_u = model._to_state_sequence(log_feats)[:, -1]        # (U, C, C)
+                            L_pos, n_pos = model.state_proj.lowrank(item_pos)
+                            L_neg, n_neg = model.state_proj.lowrank(item_neg)
+                            sp = model._hs_mixed(rho_u, L_pos[:, -1], n_pos[:, -1])
+                            sn = model._hs_mixed(rho_u, L_neg[:, -1], n_neg[:, -1])
+                        else:  # state：完全低秩
+                            L_user, n_user = model.state_proj.lowrank(log_feats)
+                            L_pos, n_pos = model.state_proj.lowrank(item_pos)
+                            L_neg, n_neg = model.state_proj.lowrank(item_neg)
+                            sp = model._hs_lowrank(L_user[:, -1], n_user[:, -1], L_pos[:, -1], n_pos[:, -1])
+                            sn = model._hs_lowrank(L_user[:, -1], n_user[:, -1], L_neg[:, -1], n_neg[:, -1])
+                    else:  # covariance / confidence：统一 power 打分（取最后一步）
+                        power = model._scoring_power
+                        if args.variant == 'dynamic':
+                            C_seq = model._to_state_sequence(log_feats, normalize=False)
+                            C_u = C_seq[:, -1]  # (U, C, C)
+                            n_u = torch.diagonal(C_u, dim1=-2, dim2=-1).sum(dim=-1)  # Tr(C_T), (U,)
+                            L_pos, n_pos = model.state_proj.lowrank(item_pos)
+                            L_neg, n_neg = model.state_proj.lowrank(item_neg)
+                            sp = model._power_score(model._fro_mixed(C_u, L_pos[:, -1]), n_u, n_pos[:, -1], power)
+                            sn = model._power_score(model._fro_mixed(C_u, L_neg[:, -1]), n_u, n_neg[:, -1], power)
+                        else:  # state
+                            L_user, n_user = model.state_proj.lowrank(log_feats)
+                            L_pos, n_pos = model.state_proj.lowrank(item_pos)
+                            L_neg, n_neg = model.state_proj.lowrank(item_neg)
+                            sp = model._power_score(model._fro_lowrank(L_user[:, -1], L_pos[:, -1]), n_user[:, -1], n_pos[:, -1], power)
+                            sn = model._power_score(model._fro_lowrank(L_user[:, -1], L_neg[:, -1]), n_user[:, -1], n_neg[:, -1], power)
                 else:  # dot matching：一阶方向 dot（取最后一步 item）
                     u_dir = model.state_proj.direction(last_h)           # (U, C)
                     sp = (u_dir * item_pos[:, -1]).sum(-1)
@@ -147,6 +166,7 @@ def main():
     sn = np.concatenate(s_neg)
     report('s_pos', sp)
     report('s_neg', sn)
+    report('s_pos - s_neg (BPR 边际)', sp - sn)
     alls = np.concatenate([sp, sn])
     in01 = float((np.abs(alls) <= 0.2).mean())
     print('  score 落在 [-0.2, 0.2] 比例 = {:.2%}'.format(in01))
